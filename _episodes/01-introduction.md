@@ -1,6 +1,6 @@
 ---
 title: "Introduction: Working with Raster Data"
-teaching: 15
+teaching: 10
 exercises: 0
 
 questions:
