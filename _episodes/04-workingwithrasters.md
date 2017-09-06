@@ -16,16 +16,89 @@ keypoints:
   - "Pixel values of rasters can be extracted to a numpy array"
 ---
 
-* Demonstrate how to open and plot a geotiff
-* Demonstrate how to create a new geotiff
-* Let's talk about numpy arrays briefly (n-dimensional arrays will be covered on Thursday)
-* Read a raster in and explore it a bit as a numpy array.
-    * talk about how masking can apply here.  Rasterio vs. GDAL differences.
-* Talk about available libraries and various support for formats (rasterio vs. GDAL, for example)
-    * There are other libraries for reading rasters, but almost all wrap GDAL because of its utility.
-* Use GDALinfo to demonstrate
+## 1. Background
 
-# Landsat Imagery
+GDAL is a powerful library for reading, writing and warping raster datasets,
+and is nearly ubiquitous because of the number of file formats that it supports
+and languages for which it has bindings.  There are a variety of geospatial
+libraries available on the python package index, and almost all of them depend
+on GDAL.  One such python library developed and supported by Mapbox,
+``rasterio``, builds on top of GDAL's many features, but provides a more
+pythonic interface and supports many of the features and formats that GDAL
+supports.
+
+**When should you use GDAL?**
+* For reading, writing and warping raster datasets.
+* If you need to read or write a raster that's in an uncommon format.
+* You have sufficient access on your computer to install a low-level library.
+
+**When should you use ``rasterio`` instead of GDAL?**
+* You want to be able to ``pip install`` a functional geospatial library.
+* If GDAL's functional quirks are throwing a wrench in your geoprocessing.
+* ``rasterio`` provides some convenient plotting routines based on ``matplotlib``.
+* Provides the same functionality as GDAL in many cases, but with more familiar, pythonic interface.
+
+**When might these not be the best tools?**
+* GDAL and rasterio don't provide geoprocessing routines, but are usually just part of a geospatial workflow.
+* Other tools use GDAL and/or rasterio to provide domain-specific spatial processing routines.
+* For polished map creation and interactive visualization, a desktop GIS software may be a better, more fully-featured choice.
+
+## 2. Set up packages and data files
+
+We'll use these throughout the rest of this tutorial.
+
+{% highlight python %}
+%matplotlib inline
+
+from osgeo import gdal
+import rasterio
+from matplotlib import pyplot
+
+# here's an ASTER DEM we'll use for our demo
+DEM = 'datasets/N37W120.tif'
+{% endhighlight %}
+
+
+## 3. Inspecting a Raster
+
+When it comes down to it, a geospatial raster is just an image with some
+geospatial information.  For GDAL and rasterio, reading the pixel values of a
+raster is a primary function.  For both libraries, pixel values are returned as
+a numpy matrix.
+
+{% highlight python %}
+ds = gdal.Open(DEM)
+
+# Let's extract and plot the pixel values
+pixel_values = ds.ReadAsArray()
+pyplot.imshow(pixel_values)
+pyplot.colorbar()
+
+# and here's the geospatial projection Well-Known Text and the Affine Geotransform
+print ds.GetProjection()
+print ds.GetGeoTransform()
+{% endhighlight %}
+
+    PROJCS["WGS 84 / UTM zone 11N",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",-117],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","32611"]]
+    (233025.03117445827, 30.0, 0.0, 4210078.842723392, 0.0, -30.0)
+
+Rasterio provides the same functionality, just with a slightly different interface.
+
+{% highlight python %}
+with rasterio.open(DEM) as dem_raster:
+    pixel_values = dem_raster.read(1)  # band number
+    print dem_raster.crs   # This is returned asa dict version of the PROJ.4 format string.
+    print dem_raster.transform  # Returns the GDAL-style Affine Geotransform. (will be deprecated in rasterio 1.0)
+    print dem_raster.affine     # This is the Affine transformation object providing the same information as the GT.
+{% endhighlight %}
+
+    {'init': u'epsg:32611'}
+    [233025.03117445827, 30.0, 0.0, 4210078.842723392, 0.0, -30.0]
+    | 30.00, 0.00, 233025.03|
+    | 0.00,-30.00, 4210078.84|
+    | 0.00, 0.00, 1.00|
+
+## 4. Use Case: Calculating NDVI from Landsat 8 Imagery
 
 The Landsat program is the longest-running satellite imagery program, with the first satellite 
 in the program launched in 1972.  Landsat 8 is the latest satellite in this program, and was
@@ -35,11 +108,25 @@ launched in 2013.  Landsat observations are processed into "scenes", each of whi
 The duration of the landsat program makes it an attractive source of medium-scale imagery for
 temporal analyses.
 
-For this tutorial, we'll use the NIR and Red bands from a landsat 8 scene above 
-part of the central valley and the Sierra Nevada in California.  We'll be using 
-[Level 1 datasets](https://landsat.usgs.gov/landsat-processing-details), 
-orthorectified, map-projected images containing radiometrically calibrated data. 
-These images can be individually downloaded from a variety of sources including:
+The [Normalized Difference Vegetation
+Index](https://en.wikipedia.org/wiki/Normalized_Difference_Vegetation_Index) is
+a simple indicator that can be used to assess whether the target, usually a
+remotely-sensed raster image, contains live green vegetation.  This calculation
+uses two bands of a remote dataset, the Red and Near-Infrared (NIR) bands.
+
+TODO: render this nicely
+\\[
+\begin{align}
+NDVI & = \frac{(NIR - Red)}{(NIR + Red)}
+\end{align}
+\\]
+
+For this tutorial, we'll use the NIR and Red bands from a landsat 8 scene above
+part of the central valley and the Sierra Nevada in California.  We'll be using
+[Level 1 datasets](https://landsat.usgs.gov/landsat-processing-details),
+orthorectified, map-projected images containing radiometrically calibrated
+data. These images can be individually downloaded from a variety of sources
+including:
 
 * [USGS EarthExplorer](https://earthexplorer.usgs.gov/) (Account required for download)
 * [Amazon AWS](https://aws.amazon.com/public-datasets/landsat/)
@@ -57,494 +144,229 @@ More information on Landsat collections here: [https://landsat.usgs.gov/landsat-
 |![Preview of our landsat 8 scene][landsat8preview]|
 |--------------------------------------------------|
 
-# Set up package imports and data files
+### Bands
 
-We'll use these throughout the rest of the tutuorial.
+* Red: Band 4 (file: ``LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF``)
+* Near-Infrared: Band 5 (file: ``LC08_L1TP_042034_20130605_20170310_01_T1_B5_120x120.tif``)
+
+Because of the longevity of the landsat mission and because different sensors
+on the satellite record data at different resolutions, these bands are
+individually stored as single-band raster files.  Some other rasters may store
+multiple bands in the same file.
+
+NB: Landsat scenes are distributed with a 30m pixel resolution.  For the sake
+of this tutorial and the computational time on our jupyterhub instance, these
+scenes have been downsampled to 120m.
+
 
 {% highlight python %}
-%matplotlib inline
-from matplotlib import pyplot
-
-# These two libraries are both very useful for reading and writing raster
-# datasets.  Rasterio includes some plotting functionality, which we'll use 
-# here as well.
-from osgeo import gdal
-import rasterio
-
-# We can use these constants for the paths so you don't have to type them out!
-# If you've cloned this repository, these files will already be here.
-
 L8_RED = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF'
 L8_NIR = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B5_120x120.TIF'
 {% endhighlight %}
 
+Let's start out by:
 
-# Reading pixel values
+* extracting the pixel values from both of these rasters 
+* calculating the NDVI
+* Plotting the calculated NDVI values
+
+As a reminder, here's the NDVI equation:
+
+\begin{align}
+NDVI & = \frac{(NIR - Red)}{(NIR + Red)}
+\end{align}
+
 
 {% highlight python %}
-# We can see that GDAL has opened the dataset properly by checking the value of ``dataset``.
-dataset = gdal.Open(L8_RED)
-print dataset  # <osgeo.gdal.Dataset; proxy of <Swig Object of type 'GDALDatasetShadow *' at 0x1023394e0> >
-band_matrix = dataset.ReadAsArray()
-print band_matrix
+    red_ds = gdal.Open(L8_RED)
+    red_band = red_ds.GetRasterBand(1)
+    red_pixels = red_band.ReadAsArray()
+    pyplot.imshow(red_pixels)
+    pyplot.colorbar()
+{% endhighlight %}
+TODO: image of red band
+
+
+{% highlight python %}
+    nir_ds = gdal.Open(L8_NIR)
+    nir_band = nir_ds.GetRasterBand(1)
+    nir_pixels = nir_band.ReadAsArray()
+    pyplot.imshow(nir_pixels)
+    pyplot.colorbar()
+{% endhighlight %}
+TODO: image of nir band
+
+Now, let's calculate the NDVI from these two matrices.
+
+{% highlight python %}
+    def ndvi(red, nir):
+        """Calculate NDVI."""
+        return (nir_pixels - red_pixels) / (nir_pixels + red_pixels)
+    
+    pyplot.imshow(ndvi(red_pixels, nir_pixels))
+    pyplot.colorbar()
+{% endhighlight %}
+TODO: show integer division image.
+
+The plot is filled with ``0``!  It turns out that the datatype of the returned
+matrices matters a lot, and both of these rasters have pixel values that are
+positive (unsigned) integers, which is also reflected in the array's numpy
+dtypes.  This is probably leading to an integer division issue if we're using
+python 2.
+
+{% highlight python %}
+    print gdal.GetDataTypeName(red_band.DataType), red_pixels.dtype
+    print gdal.GetDataTypeName(nir_band.DataType), nir_pixels.dtype
+{% endhighlight %}
+
+    UInt16 uint16
+    UInt16 uint16
+
+Let's convert the matrices to a floating-point dtype and calculate the NDVI once again.
+
+{% highlight python %}
+    import numpy
+    
+    red_pixels = red_pixels.astype(numpy.float64)
+    nir_pixels = nir_pixels.astype(numpy.float64)
+    
+    ndvi_pixels = ndvi(red_pixels, nir_pixels)
+    pyplot.imshow(ndvi_pixels, cmap='RdYlGn')
+    pyplot.colorbar()
+{% endhighlight %}
+TODO: show ndvi_invalid_nodata_areas.png
+
+According to the [docs for Landsat 8](https://landsat.usgs.gov/collectionqualityband),
+those blank areas around the edges should be ignored.  Many raster datasets
+implement this with an optional **nodata value**.  If a nodata value is set,
+then any pixel values that match it should be ignored.  It turns out that this
+band doesn't have a defined nodata value.
+
+{% highlight python %}
+    # This band does not have a nodata value!
+    print red_band.GetNoDataValue()
+{% endhighlight %}
+
+    None
+
+It turns out that we know from the docs that there's another landsat band
+(``_BQA.TIF``) for our scene that contains extra metadata about the pixels of
+the scene.  In this raster, any pixels with a value of ``1`` is filler and can
+be ignored.
+
+Let's create an NDVI matrix where:
+* Any pixels marked as filler in the ``_BQA.TIF`` raster are set to ``-1``.
+* Any pixels where the denominator is ``0`` is also set to ``-1``.
+
+{% highlight python %}
+    L8_QA = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_BQA_120x120.TIF'
 {% endhighlight %}
 
 {% highlight python %}
-with rasterio.open(L8_RED) as red:
-    band_matrix = red.read(1)
-    print band_matrix
+    import numpy
+    
+    qa_ds = gdal.Open(L8_QA)
+    qa_band = qa_ds.GetRasterBand(1)
+    qa_pixels = qa_band.ReadAsArray()
+    
+    def ndvi_with_nodata(red, nir, qa):
+        ndvi = (nir - red) / (nir + red)
+        ndvi[qa == 1] = -1
+        return ndvi
+        
+    ndvi_pixels = ndvi_with_nodata(red_pixels, nir_pixels, qa_pixels)
+    pyplot.imshow(ndvi_pixels, cmap='RdYlGn')
+    pyplot.colorbar()
+{% endhighlight %}
+TODO: show ndvi_with_nodata_value.png
+
+## 5. Save the NDVI Raster to Disk
+
+Now, let's create an output geospatial raster and write our new NDVI values to it.
+
+To do this, we need to tell GDAL which file format to use, if there are any
+special options that should be set when the file is created, and what the
+raster's dimensions should be.  We'll use the ``GTiff`` driver for this.
+GeoTiff is an open format that is very well supported by GDAL and most GIS
+applications.  (For a full list of supported formats, take a look at
+``gdalinfo --formats``.)
+
+{% highlight python %}
+    driver = gdal.GetDriverByName('GTiff')
+    new_dataset = driver.Create('ndvi.tif',
+                                ds.RasterXSize,    # number of columns
+                                ds.RasterYSize,    # number of rows
+                                1,                 # number of bands
+                                gdal.GDT_Float32)  # datatype of the raster
+    new_dataset.SetProjection(ds.GetProjection())
+    new_dataset.SetGeoTransform(ds.GetGeoTransform())
+    
+    # Now we need to set the band's nodata value to -1
+    new_band = new_dataset.GetRasterBand(1)
+    new_band.SetNoDataValue(-1)
+    
+    # And finally, let's write our NDVI array.
+    new_band.WriteArray(ndvi_pixels)
 {% endhighlight %}
 
-
-
-
-
-
-
-
-
-
-
-# Supported Formats:
-
-As of the latest version of GDAL, 142 formats are supported, but builds for various platforms may omit support for some formats.  The docker images for this tutorial include a GDAL build with support for 124 formats, including a few that have both raster and vector layers.
-
->## Not all formats are supported equally
->GDAL's drivers do not support all formats equally, and differences are 
-> listed in `gdalinfo --formats`.
-> * ``ro`` - read-only support
-> * ``rw`` - reading and writing to existing files (and making copies) supported
-> * ``rw+`` - reading, writing and creation of new files supported
-> * ``v`` - the format supports streaming through virtual filesystem API.  Streaming sources include compressed archives (such as ``.tar.gz``) and remote file servers (such as HTTP, FTP)
-> * ``s`` - the format support subdatasets
-{: .callout}
-
-{% highlight bash%}
-$ gdalinfo --formats
-Supported Formats:
-  VRT -raster- (rw+v): Virtual Raster
-  GTiff -raster- (rw+vs): GeoTIFF
-  NITF -raster- (rw+vs): National Imagery Transmission Format
-  RPFTOC -raster- (rovs): Raster Product Format TOC format
-  ...
-  # There are lots more, results depend on your build
+{% highlight python %}
+    # Here's the rasterio equivalent
+    with rasterio.open(L8_RED) as red_raster:
+        source_crs = red_raster.crs
+        source_transform = red_raster.transform
+    
+    with rasterio.open('ndvi.tif', 'w', driver='GTIff',
+                       height=ndvi_pixels.shape[0],    # numpy of rows
+                       width=ndvi_pixels.shape[1],     # number of columns
+                       count=1,                        # number of bands
+                       dtype=rasterio.dtypes.float64,  # this must match the dtype of our array
+                       crs=source_crs,
+                       transform=source_transform) as ndvi_raster:
+        ndvi_raster.write(ndvi_pixels, 1)  # optional second parameter is the band number to write to
+        ndvi_raster.nodata = -1  # set the raster's nodata value
 {% endhighlight %}
 
-Specifics about each format can be found with the ``--format`` parameter.  Let's take a look
-at the GeoTiff format, which is well-supported and has many possible creation options.
-
-{% highlight bash%}
-$ gdalinfo --format GTiff
+{% highlight shell %}
+    !gdalinfo ndvi.tif
 {% endhighlight %}
 
-GDAL also has prose documentation available for each format, including detailed information
-about creation options available on their website at: 
-[http://www.gdal.org/formats_list.html](http://www.gdal.org/formats_list.html).
+    Driver: GTiff/GeoTIFF
+    Files: ndvi.tif
+    Size is 1928, 1881
+    Coordinate System is:
+    PROJCS["WGS 84 / UTM zone 11N",
+        GEOGCS["WGS 84",
+            DATUM["WGS_1984",
+                SPHEROID["WGS 84",6378137,298.257223563,
+                    AUTHORITY["EPSG","7030"]],
+                AUTHORITY["EPSG","6326"]],
+            PRIMEM["Greenwich",0],
+            UNIT["degree",0.0174532925199433],
+            AUTHORITY["EPSG","4326"]],
+        PROJECTION["Transverse_Mercator"],
+        PARAMETER["latitude_of_origin",0],
+        PARAMETER["central_meridian",-117],
+        PARAMETER["scale_factor",0.9996],
+        PARAMETER["false_easting",500000],
+        PARAMETER["false_northing",0],
+        UNIT["metre",1,
+            AUTHORITY["EPSG","9001"]],
+        AUTHORITY["EPSG","32611"]]
+    Origin = (203385.000000000000000,4261815.000000000000000)
+    Pixel Size = (120.000000000000000,-120.000000000000000)
+    Metadata:
+      AREA_OR_POINT=Area
+    Image Structure Metadata:
+      INTERLEAVE=BAND
+    Corner Coordinates:
+    Upper Left  (  203385.000, 4261815.000) (120d23'56.68"W, 38d27'19.28"N)
+    Lower Left  (  203385.000, 4036095.000) (120d18'29.96"W, 36d25'27.35"N)
+    Upper Right (  434745.000, 4261815.000) (117d44'54.15"W, 38d30' 8.31"N)
+    Lower Right (  434745.000, 4036095.000) (117d43'42.06"W, 36d28' 4.47"N)
+    Center      (  319065.000, 4148955.000) (119d 2'45.84"W, 37d28'11.22"N)
+    Band 1 Block=1928x1 Type=Float64, ColorInterp=Gray
+      NoData Value=-1
 
-## GDAL CLI Utilities
 
-GDAL provides a number of command-line utilities to automate common processes.  To see the utilities available on your system:
-
-{% highlight text%}
-$ ls -la /usr/local/bin/gdal*
-{% endhighlight %}
-
-A full listing of GDAL utilities is available on the [GDAL website](http://gdal.org/gdal_utilities.html). A few that might be particularly useful to you include:
-
-* ``gdalinfo`` - Describe relevant information about a raster, will include the Raster Attribute Table in XML, if one exsits.
-* ``gdal_translate`` - Copy contents of an existing raster image to a new one, with new creation options.
-* ``gdal_merge.py`` - We'll use this to merge our two DEMs together into a single raster file.
-* ``gdalmanage`` - Identify raster datatypes, and/or delete, rename, and copy files in a dataset. 
-
-Each of these GDAL utilities automate certain pieces of commonly-used functionality.  Python scripts can also be used as examples for how to use the GDAL python API for those
-writing software that interfaces directly with the SWIG API.
-
-## Access to GDAL libraries
-
-GDAL is a C++ library, but you don't need to write your software in C++ to use it.
-Official bindings are available for other languages: 
-Python [PyPI](http://pypi.python.org/pypi/GDAL), C#, Ruby, Java, Perl, and PHP.
-
-Of course, you can write your software in C++ if you like :)  For the purposes
-of this tutorial, we'll interact with the official python bindings.
-
-> ## A note about pythonic behavior
->
-> There are several ways that GDAL's bindings behave that may catch you by surprise.
-> This tutorial will avoid most of them, but it's good to know that these exist if you
-> end up writing software that uses GDAL.  For the full list of gotchas, take a look at
-> [https://trac.osgeo.org/gdal/wiki/PythonGotchas](https://trac.osgeo.org/gdal/wiki/PythonGotchas)
-{: .callout}
-
-# Sample datasets
-
-We'll use a couple of datasets for this tutorial, all of which are in ``/data``
-on the ``geohackweek2016/raster`` docker image.
-
-These datasets are projected in WGS84/UTM zone 11N, as they are located in the southern
-Sierra Nevada mountains in California.
-
-## ASTER DEMs
-
-ASTER (Advanced Spaceborne Thermal Emission and Reflection Radiometer) is a remote
-sensor operated as a collaboration between NASA and Japan's Ministry of Economy,
-Trade and Industry (METI).  Located on board the
-[Terra](https://en.wikipedia.org/wiki/Terra_(satellite)) satellite that was launched
-in 1999, raw ASTER data provides imagery across 14 bands at resolutions between 15
-and 90 meters.  The sample datasets we'll be using today are from the ASTER Global
-DEM (GDEM) version 2, and have been projected into the WGS84/UTM11N coordinate system.
-
-|-----------------------|-----------------------|
-| ``/data/N38W120.tif`` | ``/data/N37W120.tif`` |
-|-----------------------|-----------------------|
-| ![DEM 1](N38W120.png) | ![DEM 1](N37W120.png) |
-|-----------------------|-----------------------|
-| ASTER GDEM is a product of METI and NASA.     |
-|-----------------------------------------------|
-
-Let's take a look at one of these rasters with ``gdalinfo``:
-
-~~~
-$ gdalinfo /data/N38W120.tif
-~~~
-{: .shell}
-
-Note a few relevant details about the raster:
-
-	* Only 1 band in this raster
-    * Data type of raster is 16-bit integer
-    * The raster is compressed with ``DEFLATE`` mode
-    * Pixel values range from 1272 - 3762
-    * Note block size is a whole row of pixels.
-
-## Land-Use / Land-Cover
-
-This Land-use/land-cover raster is a subset of a global climatology analysis
-based on Moderate-resolution imaging spectroradiometer (MODIS) datasets at a 
-1km scale.  The MODIS sensor is on board the same satellite as the ASTER 
-sensor, and records data at a scale between 250m and 1km across 36 bands.
-This raster dataset has been clipped to a region that includes the southern
-portion of the Sierra Nevada mountain range.
-
-|------------------------------------------------------------------|
-| ``/data/landcover.tif``              							   |
-|------------------------------------------------------------------|
-| ![LULC](landcover.png)             							   |
-|------------------------------------------------------------------|
-| Source: [USGS](http://landcover.usgs.gov/global_climatology.php) |
-|------------------------------------------------------------------|
-
-# Using GDAL
-
-We'll interact primarily with GDAL through their official python bindings.
-
-## Begin by importing these libraries
-
-~~~
-from osgeo import gdal
-~~~
-
-### Open the dataset
-
-First we open the raster so we can explore its attributes, as in the introduction.  GDAL will detect the format if it can, and return a *gdal.Dataset* object.
-
-~~~
-ds = gdal.Open('/data/N37W120.tif')
-~~~
-{: .python}
-
-You'll notice this seemed to go very fast. That is because this step does not 
-actually ask Python to read the data into memory. Rather, GDAL is just scanning 
-the contents of the file to allow us access to certain critical characteristics.
-
->## Filepath encodings:
-> GDAL expects the path to the raster to be ASCII or UTF-8, which is a common 
-> filesystem encoding on linux and macs. Windows is often
-> [ISO-8859-1 (Latin-1)](https://en.wikipedia.org/wiki/ISO/IEC_8859-1), or else
-> uses a codepage most similar to your locale.
-> This will only be an issue with python 2.x, as the ``str`` type in python3 is
-> assumed to be encoded as UTF-8.
-{: .callout}
-
->## Note on Error Handling:
-> While GDAL's python bindings have become much more pythonic, errors are not
-> automatically raised as python exceptions.  Instead, the default error behavior
-> is to print a message to your stdout console and return ``None`` from the operation.
->
-> If you experience ``AttributeError: 'NoneType' object has no attribute 'foo'``, this
-> may be why.
->
-> #### Pythonic Error Handling
-> ~~~
-> gdal.UseExceptions()
-> ~~~
-> {: .python}
-{: .callout}
-
-
-
-### Inspecting the Dataset:
-
-Since rasters can be very, very large, GDAL will not read its contents into 
-memory until we need to access those values.  Various formats support different
-amounts of data (GeoTiff, should support exabytes-large files), so GDAL provides
-various methods to access attributes of the dataset without reading in all
-of the pixel values.
-
-As with any python library, the methods available from the ``ds`` object can be
-read through with ``help()``.
-
-~~~
-help(ds)
-~~~
-{: .python}
-
-### Driver
-
-Since GDAL will happily open any dataset it knows how to open, one of the attributes
-we can query is the driver that was used:
-
-~~~
-ds.GetDriver().LongName
-ds.GetDriver().ShortName
-~~~
-{: .python}
-
-You'll recognize these names from when we previously looked into ``gdalinfo --format(s)``.  Either of these format names are acceptable for internal GDAL or if we're creating our own raster datasets.
-
-### Coordinate Reference System:
-
-Each dataset can have a coordinate reference system defined, which we can retrieve as Well-Known Text (WKT).
-
-~~~
-ds.GetProjection()
-~~~
-{: .python}
-
-This isn't especially easy to read, but it is a valid projection string.  We can also print this
-nicely with a couple of extra steps, using the ``osgeo.osr`` module for manipulating spatial references.
-
-~~~
-from osgeo import osr
-
-raster_wkt = ds.GetProjection()
-spatial_ref = osr.SpatialReference()
-spatial_ref.ImportFromWkt(raster_wkt)
-print spatial_ref.ExportToPrettyWkt()
-~~~
-{: .python}
-
-If you're familiar with GIS software, the PROJ.4 projection string may be more useful:
-
-~~~
-print spatial_ref.ExportToProj4()
-~~~
-{: .python}
-
-### Dimensions
-
-Dimensions are accessed as attributes of the Dataset class.  X size represents the 
-number of columns, Y size represents the number of rows.
-
-~~~
-ds.RasterXSize
-ds.RasterYSize
-~~~
-{: .python}
-
-
-### Block Sizes
-
-Rasters are stored on disk in contiguous chunks called _blocks_, which become very useful
-when trying to optimize your application for speed of execution.  We'll cover more on that
-later, but for now, you can access the block size like so:
-
-~~~
-ds.GetBlockSize()
-~~~
-{: .python}
-
-In this case, the blocksize is one row at a time, but different rasters can be laid
-out differently on disk (represented by different block sizes).  The landcover
-raster, for example, has a very different blocksize:
-
-~~~
-lulc_ds = gdal.Open('/data/landcover.tif')
-lulc_ds.GetBlockSize()
-~~~
-{: .python}
-
-![LULC blocksizes](landcover-blocks.png)
-
-## Reading Raster Values
-
-Several GDAL objects have ``ReadAsArray()`` methods:
-
-* ``gdal.Dataset``
-* ``gdal.Band``
-* ``gdal.RasterAttributeTable``
-
-~~~
-array = ds.ReadAsArray()
-~~~
-{: .python}
-
-In our case, the raster ``/data/N37W120.tif`` only contains a single band, so 
-both ``ds.ReadAsArray()`` and ``band.ReadAsArray()`` will return the same data.
-The number of bands can be checked before loading the array:
-
-~~~
-ds.RasterCount
-~~~
-{: .python}
-
-Even if there is only 1 band in the raster, you can still retrieve the band object
-before accessing the raster's array. Note that some attributes, especially 
-nodata value and band-specific metadata.
-For a full listing of band attributes, see the 
-[GDAL Data Model documentation](http://www.gdal.org/gdal_datamodel.html) and the 
-[python API docs](http://www.gdal.org/python/osgeo.gdal.Band-class.html).
-
-~~~
-band = ds.GetRasterBand(1)
-array = band.ReadAsArray()
-nodata = band.GetNoDataValue()
-metadata = band.GetMetadata()
-~~~
-{: .python}
-
-
-While ``ReadAsArray()`` can be used to read the whole array into memory,
-you can also specify a subset of the raster or band to open with a few
-optional parameters to ``ReadAsArray()``.
-
-~~~
-band = ds.GetRasterBand(1)
-full_array = band.ReadAsArray()
-
-# Start at index (100, 100) and read in an array 250 pixels wide
-array_part = band.ReadAsArray(
-    xoff=100,
-    yoff=100,
-    xsize=250,
-    ysize=250)
-~~~
-{: .python}
-
-Note that while the size of ``array_part`` is exactly what we requested, GDAL has to
-read in an enormous number of pixels in order to obtain the small, requested subset.
-
-![Blocks read in and discarded for a small window of values](N37W120-read-blocks.png)
-
-## Copying Raster Datasets
-
-### Copying files without GDAL:
-
-~~~
-import os
-os.copyfile(
-    '/path/to/raster.tif',
-    '/path/to/newraster.tif')
-~~~
-{: .python}
-
-
-### Copying files with GDAL CLI utilities
-
-~~~
-gdalmanage copy /data/N37W120.tif /tmp/N37W120_copy.tif
-~~~
-{: .shell}
-
-
-### Copying files with GDAL SWIG bindings 
-~~~
-from osgeo import gdal
-driver = gdal.GetDriverByName('GTiff')
-new_ds = driver.CreateCopy('/path/to/new_raster.tif', ds)
-new_ds = None  # flush the dataset to disk and close the underlying objects.
-~~~
-{: .python}
-
-
-### Creating new files with GDAL
-
-~~~
-from osgeo import gdal
-driver = gdal.GetDriverByName('GTiff')
-new_ds = driver.Create(
-    'path/to/new_raster.tif',
-    400,  # xsize
-    600,  # ysize
-    1,    # number of bands
-    gdal.GDT_Float32,  # The datatype of the pixel values
-    options=[  # Format-specific creation options.
-        'TILED=YES',
-        'BIGTIFF=IF_SAFER',
-        'BLOCKXSIZE=256',  # must be a power of 2
-        'BLOCKYSIZE=256'   # also power of 2, need not match BLOCKXSIZE
-    ])
-
-# fill the new raster with nodata values
-new_ds.SetNoDataValue(-1)
-new_ds.fill(-1)
-
-# When all references to new_ds are unset, the dataset is closed and flushed to disk
-new_ds = None
-~~~
-{: .python}
-
-## Writing to a raster
-
-Unlike reading to an array, writing only happens at the band level.
-
-~~~
-writeable_ds = gdal.Open('/path/to/raster.tif', gdal.GA_Update)
-band = writeable_ds.GetRasterBand(1)
-
-array = band.ReadAsArray()
-array += 1
-band.WriteArray(array)
-
-band = None
-ds = None
-~~~
-{: .python}
-
-### Other libraries that make use of GDAL:
-
-Two libraries in particular extend GDAL to provide a more pythonic interface.
-
-* [rasterio](https://pypi.python.org/pypi/rasterio)
-    * Developed by Mapbox, this compiles against GDAL but does not require it
-    in the same way that the SWIG bindings do.
-    * This library focuses on providing pythonic design patterns, and tries to
-    eliminate the python gotchas found in the GDAL SWIG bindings.
-    * Not all raster file formats supported by GDAL are supported by rasterio.
-    * Supports python versions 2 and 3.
-
-* [greenwich](https://pypi.python.org/pypi/greenwich)
-    * This is a third-party library that extends the GDAL SWIG bindings
-    * Greenwich objects still allow access to the underlying GDAL objects that
-    we reviewed in this section
-    * Attributes of a raster are accessed in the ways that python developers
-    are accustomed to.
-    * Supports python 2 only.
-
-For building geospatial web applications based on Django, be sure to check out GeoDjango:
-
-* [GeoDjango (via postGIS)](https://docs.djangoproject.com/en/1.10/ref/contrib/gis/)
-
-
-> ## How many square meters does ``/data/landcover.tif`` cover?
->
-> ~~~
-> lulc_ds = gdal.Open('/data/landcover.tif')
-> geotransform = lulc_ds.GetGeoTransform()
-> coverage_in_m = (lulc_ds.RasterXSize * math.abs(geotransform[1]) +
->   lulc_ds.RasterYSize *  math.abs(geotransform[5]))
-> ~~~
-> {: .python}
-{: .challenge}
 
 [landsat8preview]: https://landsat-pds.s3.amazonaws.com/L8/042/034/LC80420342013156LGN00/LC80420342013156LGN00_thumb_small.jpg "Landsat 8 preview image over the California Central Valley"
