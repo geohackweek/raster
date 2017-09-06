@@ -46,4 +46,5 @@ e.g. LULC, DEM, climate data
 * Application-specific operations (e.g. hydrological routing)
 
 # Limitations
+* Space-filling model assumes that all pixels have value
 
