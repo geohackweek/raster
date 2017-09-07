@@ -47,7 +47,7 @@ supports.
 
 We'll use these throughout the rest of this tutorial.
 
-{% highlight python %}
+~~~
 %matplotlib inline
 
 from osgeo import gdal
@@ -56,7 +56,8 @@ from matplotlib import pyplot
 
 # here's an ASTER DEM we'll use for our demo
 DEM = 'datasets/N37W120.tif'
-{% endhighlight %}
+~~~
+{: .python}
 
 
 ## 3. Inspecting a Raster
@@ -66,7 +67,7 @@ geospatial information.  For GDAL and rasterio, reading the pixel values of a
 raster is a primary function.  For both libraries, pixel values are returned as
 a numpy matrix.
 
-{% highlight python %}
+~~~
 ds = gdal.Open(DEM)
 
 # Let's extract and plot the pixel values
@@ -77,20 +78,22 @@ pyplot.colorbar()
 # and here's the geospatial projection Well-Known Text and the Affine Geotransform
 print ds.GetProjection()
 print ds.GetGeoTransform()
-{% endhighlight %}
+~~~
+{: .python}
 
     PROJCS["WGS 84 / UTM zone 11N",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",-117],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","32611"]]
     (233025.03117445827, 30.0, 0.0, 4210078.842723392, 0.0, -30.0)
 
 Rasterio provides the same functionality, just with a slightly different interface.
 
-{% highlight python %}
+~~~
 with rasterio.open(DEM) as dem_raster:
     pixel_values = dem_raster.read(1)  # band number
     print dem_raster.crs   # This is returned asa dict version of the PROJ.4 format string.
     print dem_raster.transform  # Returns the GDAL-style Affine Geotransform. (will be deprecated in rasterio 1.0)
     print dem_raster.affine     # This is the Affine transformation object providing the same information as the GT.
-{% endhighlight %}
+~~~
+{: .python}
 
     {'init': u'epsg:32611'}
     [233025.03117445827, 30.0, 0.0, 4210078.842723392, 0.0, -30.0]
