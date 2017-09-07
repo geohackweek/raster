@@ -26,8 +26,16 @@ raster graphics are composed of a regular grid of measurements that have
 numerical value.  We use raster graphics every day ... even the screen you're
 reading this on implements raster graphics!  These two methods of representing
 information, rasters and vectors, are complimentary, and each has their
-advantages.  In computer graphics, vector geometries are often rendered into
-raster images, effectively taking a snapshot of the geometry from a defined
+advantages:
+
+* Vector graphics are useful for storing data that has discrete boundaries,
+  such as country borders, land parcels, and streets. [source](http://support.esri.com/en/other-resources/gis-dictionary/term/vector%20data%20model) 
+* Raster graphics are useful for storing data that varies continuously, as in
+  an aerial photograph, a satellite image, a surface of chemical
+  concentrations, or an elevation surface. [source](http://support.esri.com/en/other-resources/gis-dictionary/term/raster%20data%20model)
+
+In computer graphics, vector geometries are often rendered into raster images,
+effectively taking a snapshot of the geometry from a defined
 viewpoint.  This makes it near-trivial for oour computer screens to display
 complicated graphics scenes, by reducing the complexity, detail and
 dimensionality down to a simple 2-D matrix.
