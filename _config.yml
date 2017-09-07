@@ -35,7 +35,7 @@ example_repo: "https://github.com/swcarpentry/lesson-example"
 example_site: "https://swcarpentry.github.com/lesson-example"
 
 # Start time in minutes (540 is 09:00 am)
-start_time: 810
+start_time: 630
 
 # Specify that things in the episodes collection should be output.
 collections:
