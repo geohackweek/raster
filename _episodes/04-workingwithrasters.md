@@ -158,7 +158,6 @@ NB: Landsat scenes are distributed with a 30m pixel resolution.  For the sake
 of this tutorial and the computational time on our jupyterhub instance, these
 scenes have been downsampled to 120m.
 
-
 {% highlight python %}
 L8_RED = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF'
 L8_NIR = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B5_120x120.TIF'
@@ -177,64 +176,66 @@ NDVI & = \frac{(NIR - Red)}{(NIR + Red)}
 \end{align}
 
 
-{% highlight python %}
-    red_ds = gdal.Open(L8_RED)
-    red_band = red_ds.GetRasterBand(1)
-    red_pixels = red_band.ReadAsArray()
-    pyplot.imshow(red_pixels)
-    pyplot.colorbar()
-{% endhighlight %}
-TODO: image of red band
+~~~
+red_ds = gdal.Open(L8_RED)
+red_band = red_ds.GetRasterBand(1)
+red_pixels = red_band.ReadAsArray()
+pyplot.imshow(red_pixels)
+pyplot.colorbar()
+~~~
+{: .python}
 
 
-{% highlight python %}
-    nir_ds = gdal.Open(L8_NIR)
-    nir_band = nir_ds.GetRasterBand(1)
-    nir_pixels = nir_band.ReadAsArray()
-    pyplot.imshow(nir_pixels)
-    pyplot.colorbar()
-{% endhighlight %}
-TODO: image of nir band
+~~~
+nir_ds = gdal.Open(L8_NIR)
+nir_band = nir_ds.GetRasterBand(1)
+nir_pixels = nir_band.ReadAsArray()
+pyplot.imshow(nir_pixels)
+pyplot.colorbar()
+~~~
+{: .python}
 
 Now, let's calculate the NDVI from these two matrices.
 
-{% highlight python %}
-    def ndvi(red, nir):
-        """Calculate NDVI."""
-        return (nir_pixels - red_pixels) / (nir_pixels + red_pixels)
-    
-    pyplot.imshow(ndvi(red_pixels, nir_pixels))
-    pyplot.colorbar()
-{% endhighlight %}
-TODO: show integer division image.
+~~~
+def ndvi(red, nir):
+    """Calculate NDVI."""
+    return (nir_pixels - red_pixels) / (nir_pixels + red_pixels)
+
+pyplot.imshow(ndvi(red_pixels, nir_pixels))
+pyplot.colorbar()
+~~~
+{: .python}
 
 The plot is filled with ``0``!  It turns out that the datatype of the returned
 matrices matters a lot, and both of these rasters have pixel values that are
 positive (unsigned) integers, which is also reflected in the array's numpy
 dtypes.  This is probably leading to an integer division issue if we're using
-python 2.
+python 2.  We can verify this hypothesis by checking the datatypes of both
+the rasters and the resulting matrices.
 
-{% highlight python %}
+~~~
     print gdal.GetDataTypeName(red_band.DataType), red_pixels.dtype
     print gdal.GetDataTypeName(nir_band.DataType), nir_pixels.dtype
-{% endhighlight %}
+~~~
+{: .python}
 
     UInt16 uint16
     UInt16 uint16
 
 Let's convert the matrices to a floating-point dtype and calculate the NDVI once again.
 
-{% highlight python %}
-    import numpy
-    
-    red_pixels = red_pixels.astype(numpy.float64)
-    nir_pixels = nir_pixels.astype(numpy.float64)
-    
-    ndvi_pixels = ndvi(red_pixels, nir_pixels)
-    pyplot.imshow(ndvi_pixels, cmap='RdYlGn')
-    pyplot.colorbar()
-{% endhighlight %}
-TODO: show ndvi_invalid_nodata_areas.png
+~~~
+import numpy
+
+red_pixels = red_pixels.astype(numpy.float64)
+nir_pixels = nir_pixels.astype(numpy.float64)
+
+ndvi_pixels = ndvi(red_pixels, nir_pixels)
+pyplot.imshow(ndvi_pixels, cmap='RdYlGn')
+pyplot.colorbar()
+~~~
+{: .python}
 
 According to the [docs for Landsat 8](https://landsat.usgs.gov/collectionqualityband),
 those blank areas around the edges should be ignored.  Many raster datasets
@@ -242,10 +243,11 @@ implement this with an optional **nodata value**.  If a nodata value is set,
 then any pixel values that match it should be ignored.  It turns out that this
 band doesn't have a defined nodata value.
 
-{% highlight python %}
-    # This band does not have a nodata value!
-    print red_band.GetNoDataValue()
-{% endhighlight %}
+~~~
+# This band does not have a nodata value!
+print red_band.GetNoDataValue()
+~~~
+{: .python}
 
     None
 
@@ -258,27 +260,25 @@ Let's create an NDVI matrix where:
 * Any pixels marked as filler in the ``_BQA.TIF`` raster are set to ``-1``.
 * Any pixels where the denominator is ``0`` is also set to ``-1``.
 
-{% highlight python %}
-    L8_QA = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_BQA_120x120.TIF'
-{% endhighlight %}
+~~~
+L8_QA = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_BQA_120x120.TIF'
 
-{% highlight python %}
-    import numpy
+import numpy
+
+qa_ds = gdal.Open(L8_QA)
+qa_band = qa_ds.GetRasterBand(1)
+qa_pixels = qa_band.ReadAsArray()
+
+def ndvi_with_nodata(red, nir, qa):
+    ndvi = (nir - red) / (nir + red)
+    ndvi[qa == 1] = -1
+    return ndvi
     
-    qa_ds = gdal.Open(L8_QA)
-    qa_band = qa_ds.GetRasterBand(1)
-    qa_pixels = qa_band.ReadAsArray()
-    
-    def ndvi_with_nodata(red, nir, qa):
-        ndvi = (nir - red) / (nir + red)
-        ndvi[qa == 1] = -1
-        return ndvi
-        
-    ndvi_pixels = ndvi_with_nodata(red_pixels, nir_pixels, qa_pixels)
-    pyplot.imshow(ndvi_pixels, cmap='RdYlGn')
-    pyplot.colorbar()
-{% endhighlight %}
-TODO: show ndvi_with_nodata_value.png
+ndvi_pixels = ndvi_with_nodata(red_pixels, nir_pixels, qa_pixels)
+pyplot.imshow(ndvi_pixels, cmap='RdYlGn')
+pyplot.colorbar()
+~~~
+{: .python }
 
 ## 5. Save the NDVI Raster to Disk
 
@@ -291,44 +291,55 @@ GeoTiff is an open format that is very well supported by GDAL and most GIS
 applications.  (For a full list of supported formats, take a look at
 ``gdalinfo --formats``.)
 
-{% highlight python %}
-    driver = gdal.GetDriverByName('GTiff')
-    new_dataset = driver.Create('ndvi.tif',
-                                ds.RasterXSize,    # number of columns
-                                ds.RasterYSize,    # number of rows
-                                1,                 # number of bands
-                                gdal.GDT_Float32)  # datatype of the raster
-    new_dataset.SetProjection(ds.GetProjection())
-    new_dataset.SetGeoTransform(ds.GetGeoTransform())
-    
-    # Now we need to set the band's nodata value to -1
-    new_band = new_dataset.GetRasterBand(1)
-    new_band.SetNoDataValue(-1)
-    
-    # And finally, let's write our NDVI array.
-    new_band.WriteArray(ndvi_pixels)
-{% endhighlight %}
+~~~
+driver = gdal.GetDriverByName('GTiff')
+new_dataset = driver.Create('ndvi.tif',
+                            ds.RasterXSize,    # number of columns
+                            ds.RasterYSize,    # number of rows
+                            1,                 # number of bands
+                            gdal.GDT_Float32)  # datatype of the raster
+new_dataset.SetProjection(ds.GetProjection())
+new_dataset.SetGeoTransform(ds.GetGeoTransform())
 
-{% highlight python %}
-    # Here's the rasterio equivalent
-    with rasterio.open(L8_RED) as red_raster:
-        source_crs = red_raster.crs
-        source_transform = red_raster.transform
-    
-    with rasterio.open('ndvi.tif', 'w', driver='GTIff',
-                       height=ndvi_pixels.shape[0],    # numpy of rows
-                       width=ndvi_pixels.shape[1],     # number of columns
-                       count=1,                        # number of bands
-                       dtype=rasterio.dtypes.float64,  # this must match the dtype of our array
-                       crs=source_crs,
-                       transform=source_transform) as ndvi_raster:
-        ndvi_raster.write(ndvi_pixels, 1)  # optional second parameter is the band number to write to
-        ndvi_raster.nodata = -1  # set the raster's nodata value
-{% endhighlight %}
+# Now we need to set the band's nodata value to -1
+new_band = new_dataset.GetRasterBand(1)
+new_band.SetNoDataValue(-1)
 
-{% highlight shell %}
+# And finally, let's write our NDVI array.
+new_band.WriteArray(ndvi_pixels)
+~~~
+{: .python}
+
+Here's the equivalent code to write a raster with rasterio.  You can see that
+both require the same information, but the way each library expresses the same
+things is quite different.
+
+~~~
+with rasterio.open(L8_RED) as red_raster:
+    source_crs = red_raster.crs
+    source_transform = red_raster.transform
+
+with rasterio.open('ndvi.tif', 'w', driver='GTIff',
+                   height=ndvi_pixels.shape[0],    # numpy of rows
+                   width=ndvi_pixels.shape[1],     # number of columns
+                   count=1,                        # number of bands
+                   dtype=rasterio.dtypes.float64,  # this must match the dtype of our array
+                   crs=source_crs,
+                   transform=source_transform) as ndvi_raster:
+    ndvi_raster.write(ndvi_pixels, 1)  # optional second parameter is the band number to write to
+    ndvi_raster.nodata = -1  # set the raster's nodata value
+~~~
+{: .python}
+
+And now that we've written out a new file, let's take a look at its
+characteristics with one of the GDAL command-line utilities, ``gdalinfo``.
+This utility is very useful for quickly displaying relevant information about a
+raster without exploring its data.
+
+~~~
     !gdalinfo ndvi.tif
-{% endhighlight %}
+~~~
+{: .shell}
 
     Driver: GTiff/GeoTIFF
     Files: ndvi.tif
