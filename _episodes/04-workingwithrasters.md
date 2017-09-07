@@ -184,6 +184,7 @@ pyplot.imshow(red_pixels)
 pyplot.colorbar()
 ~~~
 {: .python}
+![Matplotlib plot of the red band of the current landsat 8 scene](red_band_raw.png)
 
 
 ~~~
@@ -194,6 +195,7 @@ pyplot.imshow(nir_pixels)
 pyplot.colorbar()
 ~~~
 {: .python}
+![Matplotlib plot of the near-infrared band of the current landsat 8 scene](nir_band_raw.png)
 
 Now, let's calculate the NDVI from these two matrices.
 
@@ -206,6 +208,8 @@ pyplot.imshow(ndvi(red_pixels, nir_pixels))
 pyplot.colorbar()
 ~~~
 {: .python}
+![Matplotlib plot of calculated NDVI for the current landsat 8 scene](ndvi_integer_division.png)
+
 
 The plot is filled with ``0``!  It turns out that the datatype of the returned
 matrices matters a lot, and both of these rasters have pixel values that are
@@ -236,6 +240,9 @@ pyplot.imshow(ndvi_pixels, cmap='RdYlGn')
 pyplot.colorbar()
 ~~~
 {: .python}
+![Matplotlib plot of calculated NDVI with invalid nodata areas for the current landsat 8 scene](ndvi_invalid_nodata_areas.png)
+
+Looks like a reasonable output!
 
 According to the [docs for Landsat 8](https://landsat.usgs.gov/collectionqualityband),
 those blank areas around the edges should be ignored.  Many raster datasets
@@ -279,6 +286,7 @@ pyplot.imshow(ndvi_pixels, cmap='RdYlGn')
 pyplot.colorbar()
 ~~~
 {: .python }
+![Matplotlib plot with obviously specified nodata value](ndvi_with_nodata_value.png)
 
 ## 5. Save the NDVI Raster to Disk
 
