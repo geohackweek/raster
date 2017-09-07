@@ -463,7 +463,17 @@ gdal_calc.py \
 {: .shell}
 
 
-## 6. What about when your rasters don't line up perfectly?
+## 7. What about when your rasters don't line up perfectly?
+
+To be able to do raster math and have the outputs make sense, we may need do some combination of reprojecting, resampling and clipping.
+
+### 7a. pygeotools.warplib
+
+### 7b. gdalwap
+
+### 7c. rasterio
+
+### 7d. pygeoprocessing
 
 
 [landsat8preview]: https://landsat-pds.s3.amazonaws.com/L8/042/034/LC80420342013156LGN00/LC80420342013156LGN00_thumb_small.jpg "Landsat 8 preview image over the California Central Valley"
