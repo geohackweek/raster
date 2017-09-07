@@ -69,7 +69,7 @@ $ gdalinfo --format GTiff
 Because rasters are images, they are best thought of as 2-dimensional arrays.  If we
 have multiple bands, we could think of an image as a 3-dimensional array.
 Either way, we are working with arrays (matrices) of pixel values, which in the
-python programming language are best represented by numpy arrays.
+python programming language are best represented by [numpy](http://numpy.org) arrays.
 
 For this tutorial, we'll perform basic operations with numpy arrays extracted
 from geospatial rasters.  For more information about multidimensional array
