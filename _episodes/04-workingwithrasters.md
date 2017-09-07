@@ -10,10 +10,12 @@ objectives:
   - "Understand the basic components of a raster dataset and how to access them from a python program."
   - "Perform numerical operations on pixel values."
   - "Read from and write to raster datasets."
+  - "Be able to perform pixel-stack operations and write the output to a new raster."
 keypoints:
   - GDAL is a 'swiss army knife' for raster operations, but is pretty low-level.
   - "Rasterio provides much of GDAL's functionality and is easier to install, but supports fewer formats out of the box."
-  - "Pixel values of rasters can be extracted to a numpy array"
+  - "Pixel values of rasters can be extracted to a numpy array."
+  - "Raster analysis in python revolves around numpy arrays as the primary data structure and programming model."
 ---
 
 ## 1. Background
