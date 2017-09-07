@@ -1,6 +1,6 @@
 ---
 title: "Geospatial Concepts: Raster Data"
-teaching: 10
+teaching: 5
 exercises: 0
 
 questions:

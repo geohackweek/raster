@@ -1,7 +1,7 @@
 ---
 title: "Working with Raster Datasets"
-teaching: 20
-exercises: 10
+teaching: 45
+exercises: 0
 questions:
   - "How can I extract pixel values from a raster dataset?"
   - "How might I write pixel values out to a new raster file?"
