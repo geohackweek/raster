@@ -84,12 +84,23 @@ print ds.GetGeoTransform()
     PROJCS["WGS 84 / UTM zone 11N",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",-117],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","32611"]]
     (233025.03117445827, 30.0, 0.0, 4210078.842723392, 0.0, -30.0)
 
-Rasterio provides the same functionality, just with a slightly different interface.
+Rasterio provides the same functionality, just with a slightly different
+interface.  If you're familiary with programming in python, you've probably
+seen **context managers** before.  This context manager, ``rasterio.open``
+functions like the python standard library function ``open`` for opening files.
+The block of code within the ``with ... as`` statement is executed once the file
+is opened, and the file is closed when the context manager exits.  What this
+means for us is that we don't have to manually close the raster file once it's
+been opened, since the context manager handles it for us.
+
+By contrast, GDAL closes its raster dataset objects when its objects have no
+active references. In our case above, we're letting all of the raster objects
+go out of scope, so the cleanup happens implicitly at the end of the code.
 
 ~~~
 with rasterio.open(DEM) as dem_raster:
     pixel_values = dem_raster.read(1)  # band number
-    print dem_raster.crs   # This is returned asa dict version of the PROJ.4 format string.
+    print dem_raster.crs   # This is returned as a dict version of the PROJ.4 format string.
     print dem_raster.transform  # Returns the GDAL-style Affine Geotransform. (will be deprecated in rasterio 1.0)
     print dem_raster.affine     # This is the Affine transformation object providing the same information as the GT.
 ~~~
