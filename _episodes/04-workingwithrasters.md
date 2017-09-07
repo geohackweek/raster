@@ -471,7 +471,7 @@ To be able to do raster math and have the outputs make sense, we may need do som
 
 ### 7a. pygeotools.warplib
 
-### 7b. gdalwap
+### 7b. gdalwarp
 
 ### 7c. rasterio
 
