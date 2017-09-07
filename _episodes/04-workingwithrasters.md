@@ -130,12 +130,7 @@ a simple indicator that can be used to assess whether the target, usually a
 remotely-sensed raster image, contains live green vegetation.  This calculation
 uses two bands of a remote dataset, the Red and Near-Infrared (NIR) bands.
 
-TODO: render this nicely
-\\[
-\begin{align}
-NDVI & = \frac{(NIR - Red)}{(NIR + Red)}
-\end{align}
-\\]
+![NDVI equation](ndvi_equation.png)
 
 For this tutorial, we'll use the NIR and Red bands from a landsat 8 scene above
 part of the central valley and the Sierra Nevada in California.  We'll be using
@@ -187,9 +182,7 @@ Let's start out by:
 
 As a reminder, here's the NDVI equation:
 
-\begin{align}
-NDVI & = \frac{(NIR - Red)}{(NIR + Red)}
-\end{align}
+![NDVI equation](ndvi_equation.png)
 
 
 ~~~
@@ -467,7 +460,21 @@ gdal_calc.py \
 
 ## 7. What about when your rasters don't line up perfectly?
 
-To be able to do raster math and have the outputs make sense, we may need do some combination of reprojecting, resampling and clipping.
+To be able to do raster math and have the outputs make sense, we may need do
+some combination of reprojecting, resampling and clipping.
+
+In the case of landsat imagery below, the same scene location from different years
+will have the same projection, geotransform and pixel size, but not the same
+**extents** (boundary coordinates).
+
+|----------------------------------------------------------------------------|
+| Overlapping landsat 8 scenes from 2013 and 2016                            |
+|----------------------------------------------------------------------------|
+|![two similar landsat scenes that partially overlap](imperfect_overlap.png) |
+|----------------------------------------------------------------------------|
+
+For a case like this, the two datasets would need only to be clipped to the
+same extents before they could be processed with a raster calculator.
 
 ### 7a. pygeotools.warplib
 
@@ -476,6 +483,9 @@ To be able to do raster math and have the outputs make sense, we may need do som
 ### 7c. rasterio
 
 ### 7d. pygeoprocessing
+
+* pygeoprocessing.warp_raster and pygeoprocessing.transform_bounding_box
+* pygeoprocessing.align_and_resize_raster_stack
 
 
 [landsat8preview]: https://landsat-pds.s3.amazonaws.com/L8/042/034/LC80420342013156LGN00/LC80420342013156LGN00_thumb_small.jpg "Landsat 8 preview image over the California Central Valley"
