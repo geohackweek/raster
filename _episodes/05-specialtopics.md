@@ -19,4 +19,4 @@ keypoints:
 * Local operations (pixel-stack)
 * Focal/Neighborhood operations (e.g. convolutions)
 * Zonal operations (e.g. sum up all the pixels under this vector feature)
-* Application-specific operations (e.g. hydrological routing)
+* Application-specific operations (e.g. hydrological routing, DEM Coregistration)
