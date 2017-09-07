@@ -463,19 +463,6 @@ gdal_calc.py \
 To be able to do raster math and have the outputs make sense, we may need do
 some combination of reprojecting, resampling and clipping.
 
-In the case of landsat imagery below, the same scene location from different years
-will have the same projection, geotransform and pixel size, but not the same
-**extents** (boundary coordinates).
-
-|----------------------------------------------------------------------------|
-| Overlapping landsat 8 scenes from 2013 and 2016                            |
-|----------------------------------------------------------------------------|
-|![two similar landsat scenes that partially overlap](imperfect_overlap.png) |
-|----------------------------------------------------------------------------|
-
-For a case like this, the two datasets would need only to be clipped to the
-same extents before they could be processed with a raster calculator.
-
 ### 7a. pygeotools.warplib
 
 ### 7b. gdalwarp
