@@ -359,7 +359,7 @@ This utility is very useful for quickly displaying relevant information about a
 raster without exploring its data.
 
 ~~~
-    !gdalinfo ndvi.tif
+!gdalinfo ndvi.tif
 ~~~
 {: .shell}
 
@@ -400,6 +400,71 @@ raster without exploring its data.
     Band 1 Block=1928x1 Type=Float64, ColorInterp=Gray
       NoData Value=-1
 
+## 6. Less Verbose Raster Calculators
+
+### 6a. pygeoprocessing.raster_calculator
+
+[``Pygeoprocessing``](http://pypi.python.org/pypi/pygeoprocessing) is a python
+library developed by the [Natural Capital Project](http://naturalcapitalproject.org)
+to address a need for open-source, computationally-efficient geoprocessing
+routines in the python geospatial community.  It uses GDAL for reading and writing
+geospatial rasters, but doesn't prescribe a programming model.  It contains many
+geoprocessing functions that you may find useful, but it is not as fully-featured
+as a full GIS application.
+
+One of the functions that pygeoprocessing provides is a 
+[raster calculator][pygeoprocessing.raster_calculator], which will handle all
+of the boilerplate code for opening the needed rasters,
+creating the output raster, and handling input rasters in a
+computationally-efficient manner.
+
+The assumptions of this raster calculator are:
+* The input rasters are assumed to be spatially aligned, but need only have the same dimensions.
+* Input rasters must have the same block sizes.
+* Any GDAL-readable format may be used for input rasters, but a GeoTiff will be written out.
+
+~~~
+# Note: this requires pygeoprocessing >= 0.4
+import pygeoprocessing
+
+# Here's the same NDVI function we defined earlier
+def ndvi_with_nodata(red, nir, qa):
+    ndvi = (nir - red) / (nir + red)
+    ndvi[qa == 1] = -1
+    return ndvi
+
+pygeoprocessing.raster_calculator(
+    [(L8_RED, 1), (L8_NIR, 1), (L8_QA, 1)],
+    local_op=ndvi_with_nodata,
+    target_raster_path='ndvi.tif',
+    datatype_target=gdal.GDT_Float32,
+    nodata_target=-1)  # we assume the output nodata value is -1 in our NDVI function
+~~~
+{: .python}
+
+### 6b. gdal_calc.py
+
+If you have the GDAL command-line utilities installed, you can also use the
+provided python script to do raster calculation for you.  Like with the
+pygeoprocessing approach, all your raster inputs are assumed to be aligned and
+they must have the same dimensions.  This utility is only available from its
+command-line interface.
+
+~~~
+gdal_calc.py \
+    -A datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF \
+    -B datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B5_120x120.TIF \
+    -C datasets/LC08_L1TP_042034_20130605_20170310_01_T1_BQA_120x120.TIF \
+    --outfile=ndvi_gdalcalc.tif \
+    --type=Float64 \
+    --overwrite \
+    --calc="numpy.where(C == 1, -1, (A-B)/(A+B))"
+~~~
+{: .shell}
+
+
+## 6. What about when your rasters don't line up perfectly?
 
 
 [landsat8preview]: https://landsat-pds.s3.amazonaws.com/L8/042/034/LC80420342013156LGN00/LC80420342013156LGN00_thumb_small.jpg "Landsat 8 preview image over the California Central Valley"
+[pygeoprocessing.raster_calculator]: http://pythonhosted.org/pygeoprocessing/packages/geoprocessing.html#pygeoprocessing.geoprocessing.raster_calculator
