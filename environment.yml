@@ -1,0 +1,13 @@
+name: raster-env
+
+dependencies:
+    - python=2.7
+    - numpy
+    - scipy
+    - shapely
+    - gdal
+    - cython
+    - matplotlib
+    - pip:
+        - pygeotools
+        - pygeoprocessing>=0.4.4
