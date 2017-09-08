@@ -87,6 +87,8 @@ print ds.GetGeoTransform()
 
     (233025.03117445827, 30.0, 0.0, 4210078.842723392, 0.0, -30.0)
 
+![Stylized, projected ASTER GDEM tile](aster_dem_demo.png)
+
 Rasterio provides the same functionality, just with a slightly different
 interface.  If you're familiary with programming in python, you've probably
 seen **context managers** before.  This context manager, ``rasterio.open``
