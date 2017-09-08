@@ -57,7 +57,7 @@ import rasterio
 import matplotlib.pyplot as plt
 
 # here's an ASTER DEM we'll use for our demo
-DEM_fn = 'datasets/N37W120.tif'
+DEM_fn = '../data/N37W120.tif'
 ~~~
 {: .python}
 
@@ -172,8 +172,8 @@ of this tutorial and the computational time on our jupyterhub instance, these
 scenes have been downsampled to 120m.
 
 {% highlight python %}
-L8_RED_fn = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF'
-L8_NIR_fn = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B5_120x120.TIF'
+L8_RED_fn = '../data/LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF'
+L8_NIR_fn = '../data/LC08_L1TP_042034_20130605_20170310_01_T1_B5_120x120.TIF'
 {% endhighlight %}
 
 Let's start out by:
@@ -280,7 +280,7 @@ Let's create an NDVI array where:
 * Any pixels where the denominator is ``0`` is also set to ``-1``.
 
 ~~~
-L8_QA_fn = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_BQA_120x120.TIF'
+L8_QA_fn = '../data/LC08_L1TP_042034_20130605_20170310_01_T1_BQA_120x120.TIF'
 
 import numpy as np
 
@@ -450,9 +450,9 @@ command-line interface.
 
 ~~~
 gdal_calc.py \
-    -A datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF \
-    -B datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B5_120x120.TIF \
-    -C datasets/LC08_L1TP_042034_20130605_20170310_01_T1_BQA_120x120.TIF \
+    -A ../data/LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF \
+    -B ../data/LC08_L1TP_042034_20130605_20170310_01_T1_B5_120x120.TIF \
+    -C ../data/LC08_L1TP_042034_20130605_20170310_01_T1_BQA_120x120.TIF \
     --outfile=ndvi_gdalcalc.tif \
     --type=Float64 \
     --overwrite \
