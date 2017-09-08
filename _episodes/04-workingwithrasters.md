@@ -54,10 +54,10 @@ We'll use these throughout the rest of this tutorial.
 
 from osgeo import gdal
 import rasterio
-from matplotlib import pyplot
+import matplotlib.pyplot as plt
 
 # here's an ASTER DEM we'll use for our demo
-DEM = 'datasets/N37W120.tif'
+DEM_fn = 'datasets/N37W120.tif'
 ~~~
 {: .python}
 
@@ -67,15 +67,15 @@ DEM = 'datasets/N37W120.tif'
 When it comes down to it, a geospatial raster is just an image with some
 geospatial information.  For GDAL and rasterio, reading the pixel values of a
 raster is a primary function.  For both libraries, pixel values are returned as
-a numpy matrix.
+a numpy array.
 
 ~~~
-ds = gdal.Open(DEM)
+ds = gdal.Open(DEM_fn)
 
 # Let's extract and plot the pixel values
 pixel_values = ds.ReadAsArray()
-pyplot.imshow(pixel_values)
-pyplot.colorbar()
+plt.imshow(pixel_values)
+plt.colorbar()
 
 # and here's the geospatial projection Well-Known Text and the Affine Geotransform
 print ds.GetProjection()
@@ -84,6 +84,7 @@ print ds.GetGeoTransform()
 {: .python}
 
     PROJCS["WGS 84 / UTM zone 11N",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",-117],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","32611"]]
+
     (233025.03117445827, 30.0, 0.0, 4210078.842723392, 0.0, -30.0)
 
 Rasterio provides the same functionality, just with a slightly different
@@ -91,16 +92,16 @@ interface.  If you're familiary with programming in python, you've probably
 seen **context managers** before.  This context manager, ``rasterio.open``
 functions like the python standard library function ``open`` for opening files.
 The block of code within the ``with ... as`` statement is executed once the file
-is opened, and the file is closed when the context manager exits.  What this
-means for us is that we don't have to manually close the raster file once it's
-been opened, since the context manager handles it for us.
+is opened, and the file is closed when the context manager exits.  This
+means that we don't have to manually close the raster file, as the 
+context manager handles that for us.
 
 By contrast, GDAL closes its raster dataset objects when its objects have no
 active references. In our case above, we're letting all of the raster objects
 go out of scope, so the cleanup happens implicitly at the end of the code.
 
 ~~~
-with rasterio.open(DEM) as dem_raster:
+with rasterio.open(DEM_fn) as dem_raster:
     pixel_values = dem_raster.read(1)  # band number
     print dem_raster.crs   # This is returned as a dict version of the PROJ.4 format string.
     print dem_raster.transform  # Returns the GDAL-style Affine Geotransform. (will be deprecated in rasterio 1.0)
@@ -117,24 +118,23 @@ with rasterio.open(DEM) as dem_raster:
 ## 4. Use Case: Calculating NDVI from Landsat 8 Imagery
 
 The Landsat program is the longest-running satellite imagery program, with the first satellite 
-in the program launched in 1972.  Landsat 8 is the latest satellite in this program, and was
-launched in 2013.  Landsat observations are processed into "scenes", each of which is about 
-115 miles by 115 miles, with a temporal resolution of 16 days.
+launched in 1972.  Landsat 8 is the latest satellite in this program, and was
+launched in 2013.  Landsat observations are processed into "scenes", each of which is approximately 
+183 km x 170 km, with a temporal resolution of 16 days.
 
 The duration of the landsat program makes it an attractive source of medium-scale imagery for
-temporal analyses.
+land surface change analyses.
 
 The [Normalized Difference Vegetation
 Index](https://en.wikipedia.org/wiki/Normalized_Difference_Vegetation_Index) is
-a simple indicator that can be used to assess whether the target, usually a
-remotely-sensed raster image, contains live green vegetation.  This calculation
-uses two bands of a remote dataset, the Red and Near-Infrared (NIR) bands.
+a simple indicator that can be used to assess whether the target includes healthy vegetation.  
+This calculation uses two bands of a multispectral image dataset, the Red and Near-Infrared (NIR) bands.
 
 ![NDVI equation](ndvi_equation.png)
 
-For this tutorial, we'll use the NIR and Red bands from a landsat 8 scene above
+For this tutorial, we'll use the NIR and Red bands from a Landsat-8 scene above
 part of the central valley and the Sierra Nevada in California.  We'll be using
-[Level 1 datasets](https://landsat.usgs.gov/landsat-processing-details),
+[Level 1TP datasets](https://landsat.usgs.gov/landsat-processing-details),
 orthorectified, map-projected images containing radiometrically calibrated
 data. These images can be individually downloaded from a variety of sources
 including:
@@ -170,15 +170,16 @@ of this tutorial and the computational time on our jupyterhub instance, these
 scenes have been downsampled to 120m.
 
 {% highlight python %}
-L8_RED = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF'
-L8_NIR = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B5_120x120.TIF'
+L8_RED_fn = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF'
+L8_NIR_fn = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_B5_120x120.TIF'
 {% endhighlight %}
 
 Let's start out by:
 
+* opening the raster datasets using the GDAL Python API
 * extracting the pixel values from both of these rasters 
 * calculating the NDVI
-* Plotting the calculated NDVI values
+* visualizing the calculated NDVI values
 
 As a reminder, here's the NDVI equation:
 
@@ -186,67 +187,67 @@ As a reminder, here's the NDVI equation:
 
 
 ~~~
-red_ds = gdal.Open(L8_RED)
+red_ds = gdal.Open(L8_RED_fn)
 red_band = red_ds.GetRasterBand(1)
-red_pixels = red_band.ReadAsArray()
-pyplot.imshow(red_pixels)
-pyplot.colorbar()
+red = red_band.ReadAsArray()
+plt.imshow(red)
+plt.colorbar()
 ~~~
 {: .python}
 ![Matplotlib plot of the red band of the current landsat 8 scene](red_band_raw.png)
 
 
 ~~~
-nir_ds = gdal.Open(L8_NIR)
+nir_ds = gdal.Open(L8_NIR_fn)
 nir_band = nir_ds.GetRasterBand(1)
-nir_pixels = nir_band.ReadAsArray()
-pyplot.imshow(nir_pixels)
-pyplot.colorbar()
+nir = nir_band.ReadAsArray()
+plt.imshow(nir)
+plt.colorbar()
 ~~~
 {: .python}
 ![Matplotlib plot of the near-infrared band of the current landsat 8 scene](nir_band_raw.png)
 
-Now, let's calculate the NDVI from these two matrices.
+Now, let's calculate the NDVI from these two arrays.
 
 ~~~
 def ndvi(red, nir):
     """Calculate NDVI."""
-    return (nir_pixels - red_pixels) / (nir_pixels + red_pixels)
+    return (nir - red) / (nir + red)
 
-pyplot.imshow(ndvi(red_pixels, nir_pixels))
-pyplot.colorbar()
+plt.imshow(ndvi(red, nir))
+plt.colorbar()
 ~~~
 {: .python}
 ![Matplotlib plot of calculated NDVI for the current landsat 8 scene](ndvi_integer_division.png)
 
 
-The plot is filled with ``0``!  It turns out that the datatype of the returned
-matrices matters a lot, and both of these rasters have pixel values that are
+The plot is filled with ``0``!  It turns out that the datatype of the input and output 
+arrays is important, and both of the input rasters have pixel values that are
 positive (unsigned) integers, which is also reflected in the array's numpy
 dtypes.  This is probably leading to an integer division issue if we're using
 python 2.  We can verify this hypothesis by checking the datatypes of both
-the rasters and the resulting matrices.
+the rasters and the resulting arrays.
 
 ~~~
-    print gdal.GetDataTypeName(red_band.DataType), red_pixels.dtype
-    print gdal.GetDataTypeName(nir_band.DataType), nir_pixels.dtype
+    print gdal.GetDataTypeName(red_band.DataType), red.dtype
+    print gdal.GetDataTypeName(nir_band.DataType), nir.dtype
 ~~~
 {: .python}
 
     UInt16 uint16
     UInt16 uint16
 
-Let's convert the matrices to a floating-point dtype and calculate the NDVI once again.
+Let's convert the input arrays to a floating-point dtype and calculate the NDVI once again.
 
 ~~~
-import numpy
+import numpy as np
 
-red_pixels = red_pixels.astype(numpy.float64)
-nir_pixels = nir_pixels.astype(numpy.float64)
+red = red.astype(np.float64)
+nir = nir.astype(np.float64)
 
-ndvi_pixels = ndvi(red_pixels, nir_pixels)
-pyplot.imshow(ndvi_pixels, cmap='RdYlGn')
-pyplot.colorbar()
+ndvi = ndvi(red, nir)
+plt.imshow(ndvi, cmap='RdYlGn')
+plt.colorbar()
 ~~~
 {: .python}
 ![Matplotlib plot of calculated NDVI with invalid nodata areas for the current landsat 8 scene](ndvi_invalid_nodata_areas.png)
@@ -272,27 +273,27 @@ It turns out that we know from the docs that there's another landsat band
 the scene.  In this raster, any pixels with a value of ``1`` is filler and can
 be ignored.
 
-Let's create an NDVI matrix where:
+Let's create an NDVI array where:
 * Any pixels marked as filler in the ``_BQA.TIF`` raster are set to ``-1``.
 * Any pixels where the denominator is ``0`` is also set to ``-1``.
 
 ~~~
-L8_QA = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_BQA_120x120.TIF'
+L8_QA_fn = 'datasets/LC08_L1TP_042034_20130605_20170310_01_T1_BQA_120x120.TIF'
 
-import numpy
+import numpy as np
 
-qa_ds = gdal.Open(L8_QA)
+qa_ds = gdal.Open(L8_QA_fn)
 qa_band = qa_ds.GetRasterBand(1)
-qa_pixels = qa_band.ReadAsArray()
+qa = qa_band.ReadAsArray()
 
 def ndvi_with_nodata(red, nir, qa):
     ndvi = (nir - red) / (nir + red)
     ndvi[qa == 1] = -1
     return ndvi
     
-ndvi_pixels = ndvi_with_nodata(red_pixels, nir_pixels, qa_pixels)
-pyplot.imshow(ndvi_pixels, cmap='RdYlGn')
-pyplot.colorbar()
+ndvi = ndvi_with_nodata(red, nir, qa)
+plt.imshow(ndvi, cmap='RdYlGn')
+plt.colorbar()
 ~~~
 {: .python }
 ![Matplotlib plot with obviously specified nodata value](ndvi_with_nodata_value.png)
@@ -323,7 +324,7 @@ new_band = new_dataset.GetRasterBand(1)
 new_band.SetNoDataValue(-1)
 
 # And finally, let's write our NDVI array.
-new_band.WriteArray(ndvi_pixels)
+new_band.WriteArray(ndvi)
 ~~~
 {: .python}
 
@@ -337,13 +338,13 @@ with rasterio.open(L8_RED) as red_raster:
     source_transform = red_raster.transform
 
 with rasterio.open('ndvi.tif', 'w', driver='GTIff',
-                   height=ndvi_pixels.shape[0],    # numpy of rows
-                   width=ndvi_pixels.shape[1],     # number of columns
+                   height=ndvi.shape[0],    # numpy of rows
+                   width=ndvi.shape[1],     # number of columns
                    count=1,                        # number of bands
                    dtype=rasterio.dtypes.float64,  # this must match the dtype of our array
                    crs=source_crs,
                    transform=source_transform) as ndvi_raster:
-    ndvi_raster.write(ndvi_pixels, 1)  # optional second parameter is the band number to write to
+    ndvi_raster.write(ndvi, 1)  # optional second parameter is the band number to write to
     ndvi_raster.nodata = -1  # set the raster's nodata value
 ~~~
 {: .python}
@@ -464,6 +465,8 @@ To be able to do raster math and have the outputs make sense, we may need do
 some combination of reprojecting, resampling and clipping.
 
 ### 7a. pygeotools.warplib
+
+DEM or NDVI Differencing example
 
 ### 7b. gdalwarp
 

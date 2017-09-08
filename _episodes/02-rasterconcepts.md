@@ -36,7 +36,7 @@ advantages:
 
 In computer graphics, vector geometries are often rendered into raster images,
 effectively taking a snapshot of the geometry from a defined
-viewpoint.  This makes it near-trivial for oour computer screens to display
+viewpoint.  This makes it near-trivial for our computer screens to display
 complicated graphics scenes, by reducing the complexity, detail and
 dimensionality down to a simple 2-D matrix.
 
@@ -57,7 +57,7 @@ This is fundamentally a space-filling model, where all pixels have a value of so
 
 # What makes a raster geospatial?
 
-A raster is just an image until we specify what part of the earth the
+A raster is just an image in sensor coordinates until we specify what part of the earth the
 image covers.  This is done through two pieces of metadata that accompany the
 pixel values of the image:
 
@@ -73,26 +73,26 @@ pixel values of the image:
 
 Spatially-aware applications are careful to interpret this metadata
 appropriately.  If we aren't careful (or are using a raster-editing application
-that ignored spatial information), we can accidentlly strip this spatial
-metadata.  Photoshop, for example, can edit GeoTiffs, but we'll lose the
+that ignores spatial information), we can accidentlly strip this spatial
+metadata.  Photoshop, for example, can edit GeoTiffs, but we'll lose the embedded
 spatial metadata!
 
 # Common Types of Raster Datasets
 
 Unlike vector data, which can be points, lines, polygons, or combinations of
 these types, raster datasets are structured into 2-dimensional arrays, where
-each array element is a measurement.  This is a convenient and concise way to
+each array element is a measurement value (e.g., brightness, temperature).  This is a convenient and concise way to
 store and interact with collections of related measurements, arranged into a
 grid, and is especially convenient now that we have reliable, high-resolution
 digital photography that can be mounted to an aircraft or spacecraft.
 
-Raster datasets that can be very useful include:
+Examples of common raster datasets:
 
-* Raw, remotely-sensed imagery from airborne observatories or orbital sensors
-* Processed data products including
-    * Land Use / Land Cover rasters such as [MODIS](https://modis.gsfc.nasa.gov)
-    * Digital Elevation Models such as [ASTER GDEM](https://asterweb.jpl.nasa.gov/gdem.asp)
-    * Orthorectified, multispectral photographs such as [LANDSAT](https://landsat.usgs.gov)
+* Raw, remotely sensed imagery from airborne or satellite sensors
+* Processed and derived data products including
+    * Orthorectified, multispectral imagery such as those acquired by [Landsat](https://landsat.usgs.gov) or [MODIS](https://modis.gsfc.nasa.gov) sensors
+    * [Land-use/Land-cover products](https://www.mrlc.gov/nlcd2011.php) from classification of multispectral data
+    * Digital Elevation Models (DEMs) such as [ASTER GDEM](https://asterweb.jpl.nasa.gov/gdem.asp)
 
 # Limitations of the Raster Format
 * Measurements are spatially arranged in a regular grid, which may not be an
