@@ -7,12 +7,15 @@ exercises: 0
 
 ## Prerequisites:
 
-* GDAL binaries and GDAL python bindings installed on your system
-* Python 2 with packages:
-    * ``numpy``
-    * ``rasterio``
-    * ``pygeotools``
-    * ``pygeoprocessing>0.4``
+We'll be using a conda environment.  To set up a conda environment on your
+local computer, download [this conda environment definition](https://raw.githubusercontent.com/geohackweek/tutorial_contents/master/raster/environment.yml)
+and create an environment like so:
+
+~~~
+$ conda env create -f environment.yml
+$ source activate rasterenv
+~~~
+{: .shell}
 
 
 ## Alternate setup via docker
