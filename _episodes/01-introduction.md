@@ -18,7 +18,7 @@ $ source activate rasterenv
 {: .shell}
 
 
-## Alternate setup via docker
+## Alternate setup: Local jupyter server via docker
 
 A docker image with jupyter notebooks and a prebuilt conda environment is
 available at
