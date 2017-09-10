@@ -431,11 +431,8 @@ raster without exploring its data.
 
 [``Pygeoprocessing``](http://pypi.python.org/pypi/pygeoprocessing) is a python
 library developed by the [Natural Capital Project](http://naturalcapitalproject.org)
-to address a need for open-source, computationally-efficient geoprocessing
-routines in the python geospatial community.  It uses GDAL for reading and writing
-geospatial rasters, but doesn't prescribe a programming model.  It contains many
-geoprocessing functions that you may find useful, but it is not as fully-featured
-as a full GIS application.
+that offers open-source, computationally-efficient raster, vector and hydrological
+routines for use in geoprocessing workflows.
 
 One of the functions that pygeoprocessing provides is a 
 [raster calculator][pygeoprocessing.raster_calculator], which will handle all
@@ -493,19 +490,95 @@ gdal_calc.py \
 To be able to do raster math and have the outputs make sense, we may need do
 some combination of reprojecting, resampling and clipping.
 
+
+### 7a. Calculating Change in NDVI with Pygeoprocessing
+
+~~~
+# These are the paths to where we would like the aligned stack of inputs to be saved on disk.
+al_red_2013 = 'red_2013.tif'
+al_red_2016 = 'red_2016.tif'
+al_nir_2013 = 'nir_2013.tif'
+al_nir_2016 = 'nir_2016.tif'
+al_qa_2013 = 'qa_2013.tif'
+al_qa_2016 = 'qa_2016.tif'
+
+
+def calc_ndvi(red, nir):
+    red = red.astype(numpy.float)
+    nir = nir.astype(numpy.float)
+    return (nir - red) / (nir + red)
+
+
+def diff_ndvi(red_2013, nir_2013, qa_2013, red_2016, nir_2016, qa_2016):
+    # valid pixel stacks in this calculation are those where:
+    #   * the QA raster for both Landsat scenes indicate that the pixels aren't fill
+    #   * The denominator of the NDVI calculation isn't 0.
+    # By indexing into each raster, we only perform our NDVI calculations on
+    # stacks that we know are valid.
+    valid_pixels = (qa_2013!=1) & (qa_2016!=1) & (red_2013+nir_2013 != 0) & (red_2016+nir_2016 != 0)
+
+    ndvi_2013 = calc_ndvi(red_2013[valid_pixels], nir_2013[valid_pixels])
+    ndvi_2016 = calc_ndvi(red_2016[valid_pixels], nir_2016[valid_pixels])
+
+    ndvi = numpy.empty_like(red_2013, dtype=numpy.float32)
+    ndvi[:] = -9999
+    ndvi[valid_pixels] = ndvi_2016 - ndvi_2013
+    return ndvi
+
+red_2013_info = pygeoprocessing.get_raster_info(L8_RED_2013)
+
+# align the stack of rasters
+pygeoprocessing.align_and_resize_raster_stack(
+    [L8_RED_2013, L8_NIR_2013, L8_QA_2013, L8_RED_2016, L8_NIR_2016, L8_QA_2016],
+    [al_red_2013, al_nir_2013, al_qa_2013, al_red_2016, al_nir_2016, al_qa_2016],
+    ['nearest']*6,
+    target_pixel_size=red_2013_info['pixel_size'],
+    bounding_box_mode='intersection')
+
+
+# Calculate the difference in NDVI rasters
+pygeoprocessing.raster_calculator(
+    [(al_red_2013, 1), (al_nir_2013, 1), (al_qa_2013, 1),
+     (al_red_2016, 1), (al_nir_2016, 1), (al_qa_2016, 1)],
+    diff_ndvi, 'diff_ndvi.tif', gdal.GDT_Float32, -9999)
+~~~
+{: .python}
+
+Pygeoprocessing also has a few routines that will help us to determine the mean change in NDVI per county.
+
+~~~
+# reproject the vector to the Raster's projection
+reprojected_vector = 'ca_counties_utm11.shp'
+pygeoprocessing.reproject_vector(
+    'CA_counties/CA_counties.shp', red_2013_info['projection'],
+    reprojected_vector)
+
+# Aggregate ndvi by county name
+stats = pygeoprocessing.zonal_statistics(
+    ('diff_ndvi.tif', 1), reprojected_vector, 'NAME',
+    polygons_might_overlap=False)
+
+for county_name, aggregat_data in stats.iteritems():
+    try:
+        print county_name, aggregte_data['sum']/aggregate_data['count']
+    except ZeroDivisionError:
+        pass
+~~~
+{: .python}
+
+    Mariposa   -0.0118313196727
+    Fresno     -0.00661338400231
+    Mono       -0.00920776345542
+    Merced     0.00714124114347
+    Madera     -0.00574486546421
+    Tuolumne   0.00532270278817
+    Inyo       -0.00188927021006
+    Tulare     -0.00599385776893
+    Alpine     0.0167325024718
+
+
+
 ### Mount Rainier DEM example - next episode
-
-### 7a. pygeotools
-
-### 7b. gdalwarp
-
-### 7c. rasterio
-
-### 7d. pygeoprocessing
-
-* pygeoprocessing.warp_raster and pygeoprocessing.transform_bounding_box
-* pygeoprocessing.align_and_resize_raster_stack
-
 
 [landsat8preview]: https://landsat-pds.s3.amazonaws.com/L8/042/034/LC80420342013156LGN00/LC80420342013156LGN00_thumb_small.jpg "Landsat 8 preview image over the California Central Valley"
 [pygeoprocessing.raster_calculator]: http://pythonhosted.org/pygeoprocessing/packages/geoprocessing.html#pygeoprocessing.geoprocessing.raster_calculator
