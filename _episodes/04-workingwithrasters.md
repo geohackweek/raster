@@ -488,10 +488,27 @@ gdal_calc.py \
 ## 7. What about when your rasters are from different sources, with different projection, extent, resolution?
 
 To be able to do raster math and have the outputs make sense, we may need do
-some combination of reprojecting, resampling and clipping.
+some combination of reprojecting, resampling and clipping.  This can be done
+with just GDAL, but there are several tools out there to help us with this
+process.
 
 
-### 7a. Calculating Change in NDVI with Pygeoprocessing
+### 7a. Mount Rainier DEM example - next episode
+
+### 7b. Calculating Change in NDVI with Pygeoprocessing
+
+How about if we want to calculate the change in NDVI between two different
+landsat 8 scenes?  Here we have the same scene, both from June, but one is from
+2013 and the other is from 2016.  They're already in the same projection, but
+they are clearly misaligned.  Let's use pygeoprocessing to align and clip the
+inputs so the match and then use ``pygeoprocessing.raster_calculator`` to
+calculate the difference in NDVI between the two years.
+
+|-------------------------------------------------------------------------------------------|
+| Imperfect overlap between the same Landsat 8 scene from 2013 and 2016                     |
+|-------------------------------------------------------------------------------------------|
+| ![imperfect overlap between two years of the same Landsat 8 scene](imperfect_overlap.png) |
+|-------------------------------------------------------------------------------------------|
 
 ~~~
 # These are the paths to where we would like the aligned stack of inputs to be saved on disk.
@@ -501,14 +518,33 @@ al_nir_2013 = 'nir_2013.tif'
 al_nir_2016 = 'nir_2016.tif'
 al_qa_2013 = 'qa_2013.tif'
 al_qa_2016 = 'qa_2016.tif'
+aligned_rasters_list = [al_red_2013, al_nir_2013, al_qa_2013, al_red_2016, al_nir_2016, al_qa_2016]
 
 
-def calc_ndvi(red, nir):
-    red = red.astype(numpy.float)
-    nir = nir.astype(numpy.float)
-    return (nir - red) / (nir + red)
+red_2013_info = pygeoprocessing.get_raster_info(L8_RED_2013)
 
+# align the stack of rasters
+pygeoprocessing.align_and_resize_raster_stack(
+    [L8_RED_2013, L8_NIR_2013, L8_QA_2013, L8_RED_2016, L8_NIR_2016, L8_QA_2016],
+    aligned_rasters_list,
+    ['nearest']*6,
+    target_pixel_size=red_2013_info['pixel_size'],
+    bounding_box_mode='intersection')
 
+~~~
+{: .python}
+
+Once ``align_and_resize_raster_stack`` completes, all of the aligned raster
+datasets have the same dimensions and resolution.  We can double-check this by
+verifying that the raster's critical characteristics all match.
+
+~~~
+print set(pygeoprocessing.get_raster_info(filename) for filename in aligned_rasters_list)
+~~~
+
+Now that our rasters are aligned, we can calculate the difference in NDVI rasters.
+
+~~~
 def diff_ndvi(red_2013, nir_2013, qa_2013, red_2016, nir_2016, qa_2016):
     # valid pixel stacks in this calculation are those where:
     #   * the QA raster for both Landsat scenes indicate that the pixels aren't fill
@@ -517,26 +553,20 @@ def diff_ndvi(red_2013, nir_2013, qa_2013, red_2016, nir_2016, qa_2016):
     # stacks that we know are valid.
     valid_pixels = (qa_2013!=1) & (qa_2016!=1) & (red_2013+nir_2013 != 0) & (red_2016+nir_2016 != 0)
 
-    ndvi_2013 = calc_ndvi(red_2013[valid_pixels], nir_2013[valid_pixels])
-    ndvi_2016 = calc_ndvi(red_2016[valid_pixels], nir_2016[valid_pixels])
+    def calc_ndvi(red, nir):
+        red = red[valid_pixels].astype(numpy.float)
+        nir = nir[valid_pixels].astype(numpy.float)
+        return (nir - red) / (nir + red)
+
+    ndvi_2013 = calc_ndvi(red_2013, nir_2013)
+    ndvi_2016 = calc_ndvi(red_2016, nir_2016)
 
     ndvi = numpy.empty_like(red_2013, dtype=numpy.float32)
     ndvi[:] = -9999
     ndvi[valid_pixels] = ndvi_2016 - ndvi_2013
     return ndvi
 
-red_2013_info = pygeoprocessing.get_raster_info(L8_RED_2013)
 
-# align the stack of rasters
-pygeoprocessing.align_and_resize_raster_stack(
-    [L8_RED_2013, L8_NIR_2013, L8_QA_2013, L8_RED_2016, L8_NIR_2016, L8_QA_2016],
-    [al_red_2013, al_nir_2013, al_qa_2013, al_red_2016, al_nir_2016, al_qa_2016],
-    ['nearest']*6,
-    target_pixel_size=red_2013_info['pixel_size'],
-    bounding_box_mode='intersection')
-
-
-# Calculate the difference in NDVI rasters
 pygeoprocessing.raster_calculator(
     [(al_red_2013, 1), (al_nir_2013, 1), (al_qa_2013, 1),
      (al_red_2016, 1), (al_nir_2016, 1), (al_qa_2016, 1)],
@@ -558,7 +588,7 @@ stats = pygeoprocessing.zonal_statistics(
     ('diff_ndvi.tif', 1), reprojected_vector, 'NAME',
     polygons_might_overlap=False)
 
-for county_name, aggregat_data in stats.iteritems():
+for county_name, aggregate_data in stats.iteritems():
     try:
         print county_name, aggregte_data['sum']/aggregate_data['count']
     except ZeroDivisionError:
@@ -577,8 +607,6 @@ for county_name, aggregat_data in stats.iteritems():
     Alpine     0.0167325024718
 
 
-
-### Mount Rainier DEM example - next episode
 
 [landsat8preview]: https://landsat-pds.s3.amazonaws.com/L8/042/034/LC80420342013156LGN00/LC80420342013156LGN00_thumb_small.jpg "Landsat 8 preview image over the California Central Valley"
 [pygeoprocessing.raster_calculator]: http://pythonhosted.org/pygeoprocessing/packages/geoprocessing.html#pygeoprocessing.geoprocessing.raster_calculator
