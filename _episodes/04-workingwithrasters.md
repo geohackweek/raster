@@ -571,6 +571,9 @@ pygeoprocessing.raster_calculator(
     [(al_red_2013, 1), (al_nir_2013, 1), (al_qa_2013, 1),
      (al_red_2016, 1), (al_nir_2016, 1), (al_qa_2016, 1)],
     diff_ndvi, 'diff_ndvi.tif', gdal.GDT_Float32, -9999)
+
+pyplot.imshow(gdal.Open('diff_ndvi.tif').ReadAsArray(), cmap='RdYlGn')
+pyplot.colorbar()
 ~~~
 {: .python}
 
