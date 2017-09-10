@@ -330,25 +330,6 @@ new_band.WriteArray(ndvi)
 ~~~
 {: .python}
 
-> ## Creating copies of datasets
->
-> If we were looking to create a strict copy of one of our original GDAL
-> datasets, we could call the much more abbreviated method
-> ``driver.CreateCopy``.
->
-> ~~~
-> driver = gdal.GetDriverByName('GTiff')
-> new_dataset = driver.CreateCopy('ndvi.tif', red_ds)
-> ~~~
-> {: .python}
->
-> This is supported my many (but not all) of GDAL's drivers, and it assumes
-> that the output dataset will have all of the same attributes as the current
-> dataset.  In our case, we need a different datatype, so we use
-> ``gdal.Create`` instead.
->
-{: .callout}
-
 Here's the equivalent code to write a raster with rasterio.  You can see that
 both require the same information, but the way each library expresses the same
 things is quite different.
@@ -369,6 +350,33 @@ with rasterio.open('ndvi.tif', 'w', driver='GTIff',
     ndvi_raster.nodata = -1  # set the raster's nodata value
 ~~~
 {: .python}
+
+> ## Creating copies of datasets
+>
+> If we were looking to create a strict copy of one of our original GDAL
+> datasets, we could call the much more abbreviated method
+> ``driver.CreateCopy``.
+>
+> ~~~
+> driver = gdal.GetDriverByName('GTiff')
+> new_dataset = driver.CreateCopy('ndvi.tif', red_ds)
+> ~~~
+> {: .python}
+>
+> This is supported my many (but not all) of GDAL's drivers, and it assumes
+> that the output dataset will have all of the same attributes as the current
+> dataset.  In our case, we need a different datatype, so we use
+> ``gdal.Create`` instead.
+>
+> The equivalent rasterio code is:
+>
+> ~~~
+> rasterio.copy(L8_RED_fn, 'ndvi.tif')
+> ~~~
+> {: .python}
+>
+{: .callout}
+
 
 And now that we've written out a new file, let's take a look at its
 characteristics with one of the GDAL command-line utilities, ``gdalinfo``.
