@@ -539,7 +539,7 @@ datasets have the same dimensions and resolution.  We can double-check this by
 verifying that the raster's critical characteristics all match.
 
 ~~~
-print set(pygeoprocessing.get_raster_info(filename) for filename in aligned_rasters_list)
+print set(str(pygeoprocessing.get_raster_info(filename)) for filename in aligned_rasters_list)
 ~~~
 
 Now that our rasters are aligned, we can calculate the difference in NDVI rasters.
