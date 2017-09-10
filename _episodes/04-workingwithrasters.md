@@ -461,14 +461,14 @@ gdal_calc.py \
 {: .shell}
 
 
-## 7. What about when your rasters don't line up perfectly?
+## 7. What about when your rasters are from different sources, with different projection, extent, resolution?
 
 To be able to do raster math and have the outputs make sense, we may need do
 some combination of reprojecting, resampling and clipping.
 
-### 7a. pygeotools.warplib
+### Mount Rainier DEM example - next episode
 
-DEM or NDVI Differencing example
+### 7a. pygeotools
 
 ### 7b. gdalwarp
 
