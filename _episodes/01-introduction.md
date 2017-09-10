@@ -7,8 +7,9 @@ exercises: 0
 
 ## Prerequisites:
 
-We'll be using a conda environment.  To set up a conda environment on your
-local computer, download [this conda environment definition](https://raw.githubusercontent.com/geohackweek/tutorial_contents/master/raster/environment.yml)
+For this tutorial, you'll need a ``conda`` installation.  To set up a local
+conda environment, download [this conda environment
+definition](https://raw.githubusercontent.com/geohackweek/tutorial_contents/master/raster/environment.yml)
 and create an environment like so:
 
 ~~~
