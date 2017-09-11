@@ -8,7 +8,7 @@ objectives:
   - Understand concepts of warping raster datasets in memory
   - Load arbitrary rasters, warp, perform operations, write out
   - Gain experience working with masked arrays
-  - Basic raster plotting
+  - Plotting raster data
 keypoints:
   - pygeotools provides functions built on GDAL to simplify many raster warping tasks
   - Raster analysis in Python revolves around NumPy arrays as the primary data structure and programming model
@@ -25,9 +25,9 @@ No!  There are several options to do this quickly and efficiently, so you can ge
 Since we are in Seattle, let's use some DEMs of our friendly, neighborhood stratovolcano, Mount Rainier (AKA Tacoma or Tahoma).  Can we calculate long-term and recent glacier elevation/volume change?
 
 DEM sources:
-- 1-arcsec (30-m) USGS National Elevation Dataset (pre-2003 version) derived from digitized contour maps with 1970 source date (I merged several tiles and clipped to a large extent around Rainier)
-- 10-m airborne LiDAR data from 2007/2008 (original LiDAR was on 2-m grid, I subsampled for this exercise)
-- 8-m DEM from WorldView Stereo imagery acquired on August 8, 2015
+- 1-arcsec (30-m) USGS National Elevation Dataset derived from digitized contour maps with 1970 source date (I merged several tiles and clipped to a large extent around Rainier)
+- 10-m airborne LiDAR data from 2007/2008 (original LiDAR was on 1-m grid, I subsampled for this exercise)
+- 8-m DEM derived from WorldView Stereo imagery acquired on August 8, 2015
 
 |   |   |   |
 |:-:|:-:|:-:|
@@ -44,7 +44,7 @@ The [pygeotools](https://github.com/dshean/pygeotools) repository contains a num
 {% highlight python %}
 {% endhighlight %}
 
-Here we go.  First some imports and a function for plotting.
+Here we go.  First some imports and a function needed for plotting.  These are pretty standard, and we are going to end up using 
 
 ~~~
 from osgeo import gdal
@@ -80,24 +80,73 @@ def plot3panel(dem_list, clim=None, titles=None, cmap='inferno', label=None, ove
 ~~~
 {: .python}
 
-OK, time for some warpin'.  We are going to use the `memwarp_multi_fn` function, which accepts a list of raster filenames and allows the user to specify a desired output extent, resolution, and projection for each output in-memory GDAL dataset.  In this case, we will clip everything to a common intersection, use the minimum (best) resolution, and preserve the projection of our 2015 DEM.  See the `warptool.py` usage for valid choices
+OK, time for some warpin'.  We are going to use the `memwarp_multi_fn` function, which accepts a list of raster filenames and allows the user to specify a desired output extent, resolution, and projection for each output in-memory GDAL dataset.  In this case, we will clip everything to a common intersection, use the minimum (best) resolution, and preserve the projection of our 2015 DEM (in this case, UTM 10N, [EPSG:32610](http://spatialreference.org/ref/epsg/wgs-84-utm-zone-10n/)).  See the `warptool.py` usage for the range of valid inputs for the extent, res, and t_srs options.
 
 ~~~
 #Input DEM filenames
-dem_1970_fn = '19700901_ned1_2003_adj_warp.tif'
-dem_2008_fn = '20080901_rainierlidar_10m-adj.tif'
-dem_2015_fn = '20150818_rainier_summer-tile-0.tif'
+dem_1970_fn = 'data/rainier/19700901_ned1_2003_adj_warp.tif'
+dem_2008_fn = 'data/rainier/20080901_rainierlidar_10m-adj.tif'
+dem_2015_fn = 'data/rainier/20150818_rainier_summer-tile-0.tif'
 dem_fn_list = [dem_1970_fn, dem_2008_fn, dem_2015_fn]
+~~~
+{: .python}
 
-#This will return warped, in-memory GDAL dataset objects
-#Can also resample all inputs to a lower resolution (res=256)
+#The following will return warped, in-memory GDAL dataset objects
+#The key parameters here are extent, res, and t_srs (projection)
+#In this case, we want to clip all DEMs to the same common extent (`extent='intersection'`)
+#Let's use the minimum (highest) resolution from all input DEMs (`res='min'`)
+#And let's use the projection of the 2015 Stereo DEMs, in this case, just specify the filename (`t_srs=dem_2015_fn`)
+#Note: could also resample all inputs to a lower resolution for faster (e.g., use keyword argument `res=256`)
+
+~~~
 ds_list = warplib.memwarp_multi_fn(dem_fn_list, extent='intersection', res='min', t_srs=dem_2015_fn)
+~~~
+{: .python}
 
-#Load datasets to NumPy arrays
+That's it.  Note that warplib includes some shortcuts to avoid unnecessary warping if one of the input datasets already meets the output criteria.  
+
+Now we have a list of warped, consistent GDAL datsets for analysis.  Let's use the `iolib.ds_getma` function to load the datasets into NumPy masked arrays.  Under the hood, this runs GDAL `ReadAsArray` and goes through a cascade of approaches to mask NoData values.
+
+~~~
+#Load datasets to NumPy masked arrays
 dem_1970, dem_2008, dem_2015 = [iolib.ds_getma(i) for i in ds_list]
-dem_list = [dem_1970, dem_2008, dem_2015]
-#dem_list = [iolib.ds_getma(i) for i in ds_list]
+print(dem_2015.shape)
+print(dem_2015.dtype)
+print(dem_2015)
+~~~
+{: .python}
 
+~~~
+(2855, 3101)
+dtype('float32')
+masked_array(data =
+ [[-- -- -- ..., -- -- --]
+ [-- -- -- ..., -- -- --]
+ [-- -- -- ..., -- -- --]
+ ...,
+ [1420.24169921875 1425.361083984375 1426.648681640625 ..., -- -- --]
+ [1412.8729248046875 1419.9056396484375 1423.5897216796875 ..., -- -- --]
+ [1409.49169921875 1414.83837890625 1417.3895263671875 ..., -- -- --]],
+             mask =
+ [[ True  True  True ...,  True  True  True]
+ [ True  True  True ...,  True  True  True]
+ [ True  True  True ...,  True  True  True]
+ ...,
+ [False False False ...,  True  True  True]
+ [False False False ...,  True  True  True]
+ [False False False ...,  True  True  True]],
+       fill_value = 0.0)
+~~~
+{: .output}
+
+OK, our array has 2855 rows, 3101 columns and the values are float32.  
+
+The `print(dem_2015)` command prints the first and last three rows (lines) and columns (samples) of the raster data, and then the first and last three rows/columns of the mask.  Note that where the mask values are True, there was no valid raster data.
+
+OK, we have some numbers, but I like colorful pictures, so let's visualize this array of numbers as an image...
+
+~~~
+dem_list = [dem_1970, dem_2008, dem_2015]
 titles = ['1970', '2008', '2015']
 clim = malib.calcperc(dem_list[0], (2,98))
 plot3panel(dem_list, clim, titles, 'inferno', 'Elevation (m WGS84)', fn='dem.png')
@@ -106,21 +155,36 @@ plot3panel(dem_list, clim, titles, 'inferno', 'Elevation (m WGS84)', fn='dem.png
 
 ![Warped DEMs](dem.png)
 
+Hot!  (that color ramp is called "inferno" btw)
+
+We now have three arrays with identical extent/projection/resolution.  
+
+Computing elevation differences should now be really easy - just subtract one array from another.
+
 ~~~
-#Extract timestamps from filenames
+#Calculate elevation difference for each time period
+#In this case, we will store the difference maps in a list for convenience
+dh_list = [dem_2008 - dem_1970, dem_2015 - dem_2008, dem_2015 - dem_1970]
+
+#Let's extract timestamps from filenames
 t_list = np.array([timelib.fn_getdatetime(fn) for fn in dem_fn_list])
+#Now let's compute total time between observations in decimal years
 #Compute time differences, convert decimal years
 dt_list = [timelib.timedelta2decyear(d) for d in np.diff(t_list)]
+#Add the full 1970-2015 time difference
 dt_list.append(dt_list[0]+dt_list[1])
 
-#Calculate elevation difference for each time period 
-dh_list = [dem_2008 - dem_1970, dem_2015 - dem_2008, dem_2015 - dem_1970]
+#Now plot the elevation differences 
 titles = ['1970 to 2008 (%0.1f yr)' % dt_list[0], '2008 to 2015 (%0.1f yr)' % dt_list[1], '1970 to 2015 (%0.1f yr)' % dt_list[2]]
 plot3panel(dh_list, (-30, 30), titles, 'RdBu', 'Elevation Change (m)', fn='dem_dh.png')
 ~~~
 {: .python}
 
 ![Elevation change](dem_dh.png)
+
+Interesting, the rainier glacier "starfish" starts to pop out (red/blue) among the surfaces that aren't changing (white).
+
+But, these are cumulative elevation change in meters for the three time periods.  If we want to compare them directly, we should probably convert to some kind of average rate in meters per year.  To do this, we will divide the total elevation change by the number of years between observations (which we calcluated above as `dt_list`).
 
 ~~~
 #Calculate annual rate of change
@@ -133,10 +197,12 @@ plot3panel(dhdt_list, (-2, 2), titles, 'RdBu', 'Elevation Change Rate (m/yr)', f
 
 Hmmm, some strange positive signals over trees.  Are they growing 3 m/yr?  That would be exciting, but probably not.  Looks like our 1970 and 2008 DEMs were "bare-ground" digital terrain models (DTMs), while the 2015 DEM was a digital surface model (DSM) that included vegetation.
 
-Let's clip our map to the glaciers using polygons from the Randolph Glacier Inventory (RGI)
+Let's clip our map to the glaciers using polygons from the [Randolph Glacier Inventory (RGI)](https://www.glims.org/RGI/).  I use a [`get_rgi.sh`](https://github.com/dshean/demcoreg/blob/master/demcoreg/get_rgi.sh) script that will fetch, extract and prepare a global shapefile.
+
+To things keep moving, I've already clipped out the glacier polygons for Rainier.  We're going to first rasterize these polygons to match our warped datasets using the pygeotools `geolib.shp2array` function.  Then we're going to update the existing mask on each difference map, so that only glacier pixels remain unmasked.
 
 ~~~
-shp_fn = 'rgi60_glacierpoly_rainier.shp'
+shp_fn = 'data/rainier/rgi60_glacierpoly_rainier.shp'
 #Create binary mask from polygon shapefile to match our warped raster datasets
 shp_mask = geolib.shp2array(shp_fn, ds_list[0])
 #Now apply the mask to each array 
@@ -147,7 +213,7 @@ plot3panel(dhdt_list_shpclip, (-2, 2), titles, 'RdBu', 'Elevation Change Rate (m
 
 ![Elevation change rate, clipped to glacier polygons](dem_dhdt_shpclip.png)
 
-That looks pretty good, but some context would be nice.  Let's generate some shaded relief basemaps using gdaldem API functionality
+Now that's one patriotic "starfish."  Seeing some big elevation change signals, but some context would be nice.  Let's generate some shaded relief basemaps using gdaldem API functionality
 
 ~~~
 dem_1970_hs_ds = gdal.DEMProcessing('', ds_list[0], 'hillshade', format='MEM')
@@ -163,7 +229,9 @@ plot3panel(dhdt_list_shpclip, (-2, 2), titles, 'RdBu', 'Elevation Change Rate (m
 
 ![Elevation change rate, clipped to glacier polygons, overlaid on shaded relief](dem_dhdt_shpclip_hs.png)
 
-OK, so we have glacier elevation change rates, can we now estimate total glacier volume and mass change for the different periods? 
+OK, great, so we have a sense of spatial distribution of elevation change.  
+
+Can we now estimate total glacier volume and mass change for the different periods? 
 
 ~~~
 #Extract x and y pixel resolution (m) from geotransform
@@ -193,9 +261,8 @@ for i in out:
     print('%0.2f km^2 total area' % i[2])
     print('%0.2f km^3/yr mean volume change rate' % i[3])
     print('%0.2f km^3 total volume change' % i[4])
-    print('%0.2f km^3/yr mean mass change rate' % i[5])
-    print('%0.2f km^3 total mass change\n' % i[6])
-
+    print('%0.2f Gt/yr mean mass change rate' % i[5])
+    print('%0.2f Gt total mass change\n' % i[6])
 ~~~
 {: .python}
 
@@ -205,30 +272,30 @@ for i in out:
 92.50 km^2 total area
 -0.02 km^3/yr mean volume change rate
 -0.72 km^3 total volume change
--0.02 km^3/yr mean mass change rate
--0.62 km^3 total mass change
+-0.02 Gt/yr mean mass change rate
+-0.62 Gt total mass change
 
 2008 to 2015 (7.0 yr)
 0.15 m/yr mean elevation change rate
 92.43 km^2 total area
 0.01 km^3/yr mean volume change rate
 0.10 km^3 total volume change
-0.01 km^3/yr mean mass change rate
-0.08 km^3 total mass change
+0.01 Gt/yr mean mass change rate
+0.08 Gt total mass change
 
 1970 to 2015 (45.0 yr)
 -0.15 m/yr mean elevation change rate
 92.43 km^2 total area
 -0.01 km^3/yr mean volume change rate
 -0.63 km^3 total volume change
--0.01 km^3/yr mean mass change rate
--0.53 km^3 total mass change
+-0.01 Gt/yr mean mass change rate
+-0.53 Gt total mass change
 ~~~
 {: .output}
 
-Great.  We've got some estimates for each period.
+Great.  We've got some estimates for each period.  I limited to two decimal places, but we should probably do a more formal uncertainty analysis.  Maybe for the next tutorial... 
 
-Now, let's dig a little deeper into the spatial pattern of observed elevation change.  Let's make some 2D-histograms of elevation change vs. elevation for the two unique time periods.
+Instead, let's dig a little deeper into the spatial pattern of observed elevation change.  Let's make some 2D-histograms of elevation change vs. elevation for the two unique time periods.  We'll use the NumPy histogram2d function.
 
 ~~~
 def plothist(ax, x, y, xlim, ylim, log=False):
@@ -269,3 +336,8 @@ f.savefig('dem_vs_dhdt_log.png', bbox_inches='tight', pad_inches=0, dpi=150)
 {: .python}
 
 ![Glacier elevation change rate vs. elevation](dem_vs_dhdt.png)
+
+## Extra credit
+
+- Repeat this analysis for the Emmons Glacier (the largest glacier in the lower 48)
+- Repeat this anlysis in an equal-area projection, which is a better choice than UTM for geodetic analysis 
