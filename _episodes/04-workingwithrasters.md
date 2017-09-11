@@ -505,7 +505,7 @@ process.
 > than directly warping a single raster.
 {: .callout}
 
-### 7a. Mount Rainier DEM example - next episode
+### 7a. Mount Rainier DEM example - [next episode](https://geohackweek.github.io/raster/06-pygeotools_rainier/)
 
 ### 7b. Calculating Change in NDVI with Pygeoprocessing
 
