@@ -492,6 +492,18 @@ some combination of reprojecting, resampling and clipping.  This can be done
 with just GDAL, but there are several tools out there to help us with this
 process.
 
+> ## Warping directly with GDAL/rasterio
+> 
+> We won't cover GDAL and rasterio's low-level warping functionality, but documentation is available online if you're interested.
+> * [``rasterio.warp.reproject``](https://mapbox.github.io/rasterio/topics/reproject.html) python API documentation
+> * [``osgeo.gdal.ReprojectImage``](http://www.gdal.org/gdalwarper_8h.html#ad36462e8d5d34642df7f9ea1cfc2fec4) API documentation
+> * [``gdalwarp``](http://www.gdal.org/gdalwarp.html) command-line interface to GDAL's warping functionality
+> * ``rio warp`` (``rio warp --help``) command-line tool to rasterio's warping functionality
+>
+> Both ``pygeoprocessing`` and ``pygeotools`` have utilities to help automate
+> the warping and aligning of stacks of inputs, and are generally easier to use
+> than directly warping a single raster.
+{: .callout}
 
 ### 7a. Mount Rainier DEM example - next episode
 
