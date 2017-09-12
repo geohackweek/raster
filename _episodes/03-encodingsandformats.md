@@ -24,7 +24,7 @@ interaction and manipulation of geospatial raster data.  The primary purpose of 
 GDAL-enabled library is to read, write and transform geospatial datasets in a
 way that makes sense in the context of its spatial metadata.  GDAL also includes
 a set of [command-line utilities](http://www.gdal.org/gdal_utilities.html) (e.g., gdalinfo, gdal_translate) 
-for conveniant inspection and manipulation of raster data.
+for convenient inspection and manipulation of raster data.
 
 Other libraries also exist (we'll introduce rasterio in the next section of this
 tutorial, and even more exist in the fields of geoprocessing (which would
