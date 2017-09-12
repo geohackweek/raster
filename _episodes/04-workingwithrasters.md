@@ -56,8 +56,8 @@ from osgeo import gdal
 import rasterio
 import matplotlib.pyplot as plt
 
-# here's an ASTER DEM we'll use for our demo
-DEM_fn = '../data/N37W120.tif'
+# Here's the red band from a landsat 8 scene.
+L8_RED_fn = '../data/LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF'
 ~~~
 {: .python}
 
@@ -70,7 +70,7 @@ raster is a primary function.  For both libraries, pixel values are returned as
 a numpy array.
 
 ~~~
-ds = gdal.Open(DEM_fn)
+ds = gdal.Open(L8_RED_fn)
 
 # Let's extract and plot the pixel values
 pixel_values = ds.ReadAsArray()
@@ -87,7 +87,7 @@ print ds.GetGeoTransform()
 
     (233025.03117445827, 30.0, 0.0, 4210078.842723392, 0.0, -30.0)
 
-![Stylized, projected ASTER GDEM tile](aster_dem_demo.png)
+![Matplotlib plot of the red band of the current landsat 8 scene](red_band_raw.png)
 
 Rasterio provides the same functionality, just with a slightly different
 interface.  If you're familiary with programming in python, you've probably
@@ -103,7 +103,7 @@ active references. In our case above, we're letting all of the raster objects
 go out of scope, so the cleanup happens implicitly at the end of the code.
 
 ~~~
-with rasterio.open(DEM_fn) as dem_raster:
+with rasterio.open(L8_RED_fn) as dem_raster:
     pixel_values = dem_raster.read(1)  # band number
     print dem_raster.crs   # This is returned as a dict version of the PROJ.4 format string.
     print dem_raster.transform  # Returns the GDAL-style Affine Geotransform. (will be deprecated in rasterio 1.0)
