@@ -121,7 +121,7 @@ for i in out:
     print('%0.2f km^3 total mass change' % i[6])
     print('\n')
 
-def plothist(ax, x, y, xlim, ylim, log=False):
+def plot_2dhist(ax, x, y, xlim, ylim, log=False):
     bins = (100, 100)
     common_mask = ~(malib.common_mask([x,y]))
     x = x[common_mask]
@@ -145,11 +145,11 @@ def plothist(ax, x, y, xlim, ylim, log=False):
 f, axa = plt.subplots(2, sharex=True, sharey=True)
 dem_clim = (1000,4400)
 dhdt_clim = (-3, 3)
-plothist(axa[0], dem_list[0], dhdt_list_shpclip[0], dem_clim, dhdt_clim)
+plot_2dhist(axa[0], dem_list[0], dhdt_list_shpclip[0], dem_clim, dhdt_clim)
 axa[0].set_title('1970 to 2008')
 axa[0].set_ylabel('Elev. Change Rate (m/yr)')
 axa[0].axhline(0,lw=0.5,ls='-',c='r',alpha=0.5)
-plothist(axa[1], dem_list[1], dhdt_list_shpclip[1], dem_clim, dhdt_clim)
+plot_2dhist(axa[1], dem_list[1], dhdt_list_shpclip[1], dem_clim, dhdt_clim)
 axa[1].set_title('2008 to 2015')
 axa[1].set_ylabel('Elev. Change Rate (m/yr)')
 axa[1].axhline(0,lw=0.5,ls='-',c='r',alpha=0.5)
