@@ -58,16 +58,19 @@ $ gdalinfo --format GTiff
 ~~~
 {: .shell}
 
-> ## A note about libraries
-> Because of its broad support for raster formats, few geospatial
-> libraries exist that do not depend on GDAL.  Even the popular python library
-> ``rasterio`` has a low-level dependency on the GDAL project, though this
-> dependency is managed in a way that in some ways improves the utility of
-> GDAL.
+> ## Jupyterhub detail: location of gdal command-line scripts
+> 
+> If you've installed and activated your conda environment, ``gdalinfo`` should
+> be available.  It might not be available from your jupyter notebook, however.
+>
+> To access the gdalinfo within our jupyterhub notebook, gdalinfo is available at
+>
+>     /opt/anaconda/envs/rasterenv/bin/gdalinfo
+> 
 {: .callout}
 
 
-# Programming Model
+# Programming Model: NumPy arrays
 
 Because rasters are images, they are best thought of as 2-dimensional arrays.  If we
 have multiple bands, we could think of an image as a 3-dimensional array.
