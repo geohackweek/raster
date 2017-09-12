@@ -595,7 +595,7 @@ Pygeoprocessing also has a few routines that will help us to determine the mean 
 # reproject the vector to the Raster's projection
 reprojected_vector = 'ca_counties_utm11.shp'
 pygeoprocessing.reproject_vector(
-    'CA_counties/CA_counties.shp', red_2013_info['projection'],
+    '../data/CA_counties/CA_counties.shp', red_2013_info['projection'],
     reprojected_vector)
 
 # Aggregate ndvi by county name
