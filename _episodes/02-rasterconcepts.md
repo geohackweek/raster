@@ -19,47 +19,41 @@ keypoints:
 
 ---
 
-# Images and Pixels
+# What is a raster?
 
-While vector graphics compose points, lines and polygons from defined vertices,
-raster graphics are composed of a regular grid of measurements that have
-numerical value.  We use raster graphics every day ... even the screen you're
-reading this on implements raster graphics!  These two methods of representing
-information, rasters and vectors, are complimentary, and each has their
-advantages:
+Unlike vectors, where features have discreet boundaries (which is useful for
+storing data like country borders, land parcels and streets), rasters are
+useful for storing data that varies continuously.  At its heart, a raster is:
 
-* Vector graphics are useful for storing data that has discrete boundaries,
-  such as country borders, land parcels, and streets. [source](http://support.esri.com/en/other-resources/gis-dictionary/term/vector%20data%20model) 
-* Raster graphics are useful for storing data that varies continuously, as in
-  an aerial photograph, a satellite image, a surface of chemical
-  concentrations, or an elevation surface. [source](http://support.esri.com/en/other-resources/gis-dictionary/term/raster%20data%20model)
+* A dataset with measurements making up a rectangular grid of values.
+* (Sometimes) multiple 2-dimensional matrices that overlap perfectly and
+  portray slightly different characteristics of the same dataset.  We call
+  these **bands**.
 
-In computer graphics, vector geometries are often rendered into raster images,
-effectively taking a snapshot of the geometry from a defined
-viewpoint.  This makes it near-trivial for our computer screens to display
-complicated graphics scenes, by reducing the complexity, detail and
-dimensionality down to a simple 2-D matrix.
+In the 1950's raster graphics were noted as a faster and cheaper (but
+lower-resolution) alternative to vector graphics.
 
-Because of this snapshot quality of raster graphics, they are commonly used in
-digital photography.  Take a look at these
-three bands (red, green, and blue) from a Landsat 8 scene.  The image for each
-band was taken by a different sensor on the Landsat satellite, and each band
-contains a single value for each pixel.  Together, the values of these three
-bands can be combined into an RGB image for display as a digital image.
+|-----------------------------------------------------------------------|
+| Bands in Landsat 7 (bottom row of rectangles) and Landsat 8 (top row) |
+|-----------------------------------------------------------------------|
+| <img src="ETM+vOLI-TIRS-web_Feb20131.jpg" style="width: 1000px;"/>    |
+|-----------------------------------------------------------------------|
+| Graphic created by L.Rocchio & J.Barsi.                               |
+|-----------------------------------------------------------------------|
 
-|-----------------------------------|----------------------------------------|--------------------------------------|
-| Red Band from a Landsat Scene     | Green Band from a Landsat Scene        | Blue Band from a Landsat Scene       |
-|-----------------------------------|----------------------------------------|--------------------------------------|
-|![Landsat 8: Red Band](L8_red.png) | ![Landsat 8: Green Band](L8_green.png) | ![Landsat 8: Blue Band](L8_blue.png) |
-|-----------------------------------|----------------------------------------|--------------------------------------|
 
-This is fundamentally a space-filling model, where all pixels have a value of some sort.
+|---------------------------------------|----------------------------------------|----------------------------------------|
+| Landsat 8 Band 1 ("Ultra Blue")       | Landsat 8 Band 3 ("Green")             | Landsat 8 Band 9 ("Cirrus")            |
+|---------------------------------------|----------------------------------------|----------------------------------------|
+|![Landsat 8: Ultra Blue](L8_band1.png) | ![Landsat 8: Green Band](L8_green.png) | ![Landsat 8: Blue Band](L8_cirrus.png) |
+|---------------------------------------|----------------------------------------|----------------------------------------|
+
 
 # What makes a raster geospatial?
 
-A raster is just an image in sensor coordinates until we specify what part of the earth the
-image covers.  This is done through two pieces of metadata that accompany the
-pixel values of the image:
+A raster is just an image in local pixel coordinates until we specify what part
+of the earth the image covers.  This is done through two pieces of metadata
+that accompany the pixel values of the image:
 
 * **Coordinate Reference System** or "CRS". This specifies the mathematical
   model of the earth the image assumes.
@@ -75,18 +69,11 @@ Spatially-aware applications are careful to interpret this metadata
 appropriately.  If we aren't careful (or are using a raster-editing application
 that ignores spatial information), we can accidentlly strip this spatial
 metadata.  Photoshop, for example, can edit GeoTiffs, but we'll lose the embedded
-spatial metadata!
+CRS and geotransform!
 
 # Common Types of Raster Datasets
 
-Unlike vector data, which can be points, lines, polygons, or combinations of
-these types, raster datasets are structured into 2-dimensional arrays, where
-each array element is a measurement value (e.g., brightness, temperature).  This is a convenient and concise way to
-store and interact with collections of related measurements, arranged into a
-grid, and is especially convenient now that we have reliable, high-resolution
-digital photography that can be mounted to an aircraft or spacecraft.
-
-Examples of common raster datasets:
+Examples of common raster datasets include:
 
 * Raw, remotely sensed imagery from airborne or satellite sensors
 * Processed and derived data products including
