@@ -122,10 +122,21 @@ with rasterio.open(L8_RED_fn) as dem_raster:
 The Landsat program is the longest-running satellite imagery program, with the first satellite 
 launched in 1972.  Landsat 8 is the latest satellite in this program, and was
 launched in 2013.  Landsat observations are processed into "scenes", each of which is approximately 
-183 km x 170 km, with a temporal resolution of 16 days.
-
-The duration of the landsat program makes it an attractive source of medium-scale imagery for
+183 km x 170 km, with a temporal resolution of 16 days. The duration of the
+landsat program makes it an attractive source of medium-scale imagery for
 land surface change analyses.
+
+> ## Why not compare imagery from Landsat 7 and Landsat 8?
+> 
+> Because of Landsat 8's improved spectral quantization!  Landsat 8 can detect
+> 4096 levels of brighness with its 12-bit sensors.  Landsat 7 could detect only
+> 256 levels with its 8-bit sensors.  The end result is reduced graininess in the
+> resulting imagery.
+>
+> [![Quanitzation example](quantization.png)](https://www.nasa.gov/content/goddard/taking-nasa-usgs-s-landsat-8-to-the-beach/)
+{: .callout}
+
+### 4a: Calculating NDVI
 
 The [Normalized Difference Vegetation
 Index](https://en.wikipedia.org/wiki/Normalized_Difference_Vegetation_Index) is
