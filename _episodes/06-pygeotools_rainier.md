@@ -91,12 +91,12 @@ dem_fn_list = [dem_1970_fn, dem_2008_fn, dem_2015_fn]
 ~~~
 {: .python}
 
-#The following will return warped, in-memory GDAL dataset objects
-#The key parameters here are extent, res, and t_srs (projection)
-#In this case, we want to clip all DEMs to the same common extent (`extent='intersection'`)
-#Let's use the minimum (highest) resolution from all input DEMs (`res='min'`)
-#And let's use the projection of the 2015 Stereo DEMs, in this case, just specify the filename (`t_srs=dem_2015_fn`)
-#Note: could also resample all inputs to a lower resolution for faster (e.g., use keyword argument `res=256`)
+The following will return warped, in-memory GDAL dataset objects.  The key parameters are extent, res, and t_srs (projection):
+- In this case, we want to clip all DEMs to the same common extent (`extent='intersection'`)
+- Let's use the minimum (highest) resolution from all input DEMs (`res='min'`)
+- And let's use the projection of the 2015 Stereo DEMs, in this case, just specify the filename (`t_srs=dem_2015_fn`)
+
+Note: could also resample all inputs to a lower resolution for testing (e.g., use keyword argument `res=128`)
 
 ~~~
 ds_list = warplib.memwarp_multi_fn(dem_fn_list, extent='intersection', res='min', t_srs=dem_2015_fn)
