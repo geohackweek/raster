@@ -6,14 +6,14 @@ exercises: 0
 questions:
 - "What is a raster?"
 - "What sorts of information does a raster typically model?"
-- "What are the major charateristics of a raster dataset?"
+- "What are the major characteristics of a raster dataset?"
 - "What assumptions does the format imply?"
 
 objectives:
 - Understand the raster data model
 
 keypoints:
-- Gridded data that vary in space and time are common in many geospatial applcations
+- Gridded data that vary in space and time are common in many geospatial applications
 - Specialized tools are needed to accommodate the complexity and size of many raster datasets
 - Some image formats have been adapted to store spatial metadata
 
@@ -57,17 +57,17 @@ that accompany the pixel values of the image:
 
 * **Coordinate Reference System** or "CRS". This specifies the mathematical
   model of the earth the image assumes.
-* **Affine Geotransformation** This dicates the size, tilt and layout of the
+* **Affine Geotransformation** This dictates the size, tilt and layout of the
   raster's pixels.  Defining this for the whole image allows the image's pixels
-  to be referenced by local indices rather than global coordinates, and answers
+  to be referenced by a local array index rather than global coordinates, and answers
   questions such as:
     * How much area does a given pixel cover?
     * Given the CRS, what is the origin?
-    * In what direction does the raster "grow" as pixel indices increas?
+    * In what direction does the raster "grow" as pixel indices increase?
 
 Spatially-aware applications are careful to interpret this metadata
 appropriately.  If we aren't careful (or are using a raster-editing application
-that ignores spatial information), we can accidentlly strip this spatial
+that ignores spatial information), we can accidentally strip this spatial
 metadata.  Photoshop, for example, can edit GeoTiffs, but we'll lose the embedded
 CRS and geotransform!
 
@@ -85,6 +85,5 @@ Examples of common raster datasets include:
 * Measurements are spatially arranged in a regular grid, which may not be an
   accurate representation of real-world phenomena.
 * Space-filling model assumes that all pixels have value
-* Changes in resolution can drastically change the meaning of a dataset's
-  values.
+* Changes in resolution can drastically change the meaning of values in a dataset
 
