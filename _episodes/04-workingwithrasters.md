@@ -3,636 +3,451 @@ title: "Working with Raster Datasets"
 teaching: 45
 exercises: 0
 questions:
-  - "How can I extract pixel values from a raster dataset?"
+  - "How can I extract pixel values from rasters and perform computations?"
   - "How might I write pixel values out to a new raster file?"
-  - "What raster dataset formats (reading and writing) are supported?"
+
 objectives:
   - "Understand the basic components of a raster dataset and how to access them from a python program."
   - "Perform numerical operations on pixel values."
   - "Read from and write to raster datasets."
-  - "Be able to perform pixel-stack operations and write the output to a new raster."
+
 keypoints:
-  - GDAL is a 'swiss army knife' for raster operations, but is pretty low-level.
-  - "Rasterio provides much of GDAL's functionality and is easier to install, but supports fewer formats out of the box."
+  - "Rasterio is built around the GDAL library (recall section 3), to facilitate raster operations in Python."
   - "Pixel values of rasters can be extracted to a numpy array."
-  - "Raster analysis in python revolves around numpy arrays as the primary data structure and programming model."
+  - "Computation is done in local memory on numpy arrays, then saved to the raster format of choice."
 ---
 
 ## 1. Background
 
-GDAL is a powerful library for reading, writing and warping raster datasets,
-and is nearly ubiquitous because of the number of file formats that it supports
-and languages for which it has bindings.  There are a variety of geospatial
-libraries available on the python package index, and almost all of them depend
-on GDAL.  One such python library developed and supported by Mapbox,
-``rasterio``, builds on top of GDAL's many features, but provides a more
-pythonic interface and supports many of the features and formats that GDAL
-supports.
+[GDAL](https://en.wikipedia.org/wiki/GDAL) is a powerful and mature library for reading, writing and warping raster datasets, written in C++ with bindings to other languages. There are a variety of geospatial libraries available on the python package index, and almost all of them depend
+on GDAL.  One such python library developed and supported by Mapbox, ``rasterio``, builds on top of GDAL's many features, but provides a more pythonic interface and supports many of the features and formats that GDAL supports. Both GDAL and rasterio are constantly being updated and improved: As of writing this tutorial (July 2018), GDAL is at version 2.3.1 and rasterio is at version 1.0.2.
 
-**When should you use GDAL?**
-* For reading, writing and warping raster datasets.
-* If you need to read or write a raster that's in an uncommon format.
-* You have sufficient access on your computer to install a low-level library.
+**When should you use GDAL directly?**
+* If you are comfortable with the terminal, [GDAL's command line utilities](https://www.gdal.org/gdal_utilities.html) are very useful for scripting.
+* Note that GDAL also has auto-generated [Python bindings](https://pypi.org/project/GDAL/), but we recommend using rasterio instead!
 
 **When should you use ``rasterio`` instead of GDAL?**
-* You want to be able to ``pip install`` a functional geospatial library.
-* If GDAL's functional quirks are throwing a wrench in your geoprocessing.
-* ``rasterio`` provides some convenient plotting routines based on ``matplotlib``.
-* Provides the same functionality as GDAL in many cases, but with more familiar, pythonic interface.
+* Maybe always?! Rasterio also has a set of command line tools
+* If you are working in a Python environment (ipython, scripts, jupyter lab)
 
 **When might these not be the best tools?**
-* GDAL and rasterio don't provide geoprocessing routines, but are usually just part of a geospatial workflow.
-* Other tools use GDAL and/or rasterio to provide domain-specific spatial processing routines.
-* For polished map creation and interactive visualization, a desktop GIS software may be a better, more fully-featured choice.
+* Both libraries are critical for input/output operations, but you'll draw on other libraries for computation (e.g. numpy)
+    * That said, GDAL does have some standard processing scripts (for example [pan-sharpening](https://www.gdal.org/gdal_pansharpen.html)) and rasterio provides a [plugin interface](https://github.com/mapbox/rasterio/wiki/Rio-plugin-registry) for workflows
+* For polished map creation and interactive visualization, a desktop GIS software like [QGIS](https://qgis.org/en/site/) may be a better, more fully-featured choice.
 
-## 2. Set up packages and data files
 
-We'll use these throughout the rest of this tutorial.
+# 2. Loading and viewing Landsat 8 imagery
+
+The Landsat program is the longest-running satellite imagery program, with the first satellite launched in 1972. Landsat 8 is the latest satellite in this program, and was launched in 2013. Landsat observations are processed into “scenes”, each of which is approximately 183 km x 170 km, with a temporal resolution of 16 days. The duration of the landsat program makes it an attractive source of medium-scale imagery for land surface change analyses. Landsat is multiband imagery, you can read more about it [here](https://landsat.usgs.gov).
+
+One reason we'll use Landsat 8 for this demo is that the entire Landsat 8 archive is hosted by various commercial Cloud providers (AWS, Google Cloud), for free! Furthermore, [these archives](https://registry.opendata.aws/landsat-8/) use a new image format know as [Cloud-optimized Geotiffs (COGs)](http://www.cogeo.org), to allow easy access to full files or subsets of files from your local computer.
+
+We'll start with simply examining a single image acquired over California in summer, 2017. Landsat images are organized by 'path' and 'row', and AWS has put together a simple webpage for browsing the archive called ["Landsat on AWS"](https://landsatonaws.com). To see all the acquisition dates for a particular path and row:
+
+https://landsatonaws.com/L8/042/034
+
+
+We'll pick a scene with low cloud cover (LC08_L1TP_042034_20170616_20170629_01_T1). Note that 'T1' stands for 'Tier 1' (for analytic use), and 'RT' stands for 'Real-time', for which quality control is not as rigorous. Read more about the various Landsat formats and collections [here](https://landsat.usgs.gov/landsat-collections). So we have the following link to the acquisition landing page that has addition links to metadata and full resolution imagery files:
+
+https://landsatonaws.com/L8/042/034/LC08_L1TP_042034_20170616_20170629_01_T1    
+
+
+For example, the band 4 image is stored at:
+
+http://landsat-pds.s3.amazonaws.com/c1/L8/042/034/LC08_L1TP_042034_20170616_20170629_01_T1/LC08_L1TP_042034_20170616_20170629_01_T1_B4.TIF
+
+
+First be sure to import the Python libraries we'll be using:
 
 ~~~
-%matplotlib inline
-
-from osgeo import gdal
 import rasterio
+import rasterio.plot
+import pyproj
+import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
+~~~
 
-# Here's the red band from a landsat 8 scene.
-L8_RED_fn = '../data/LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF'
+~~~
+filepath = 'http://landsat-pds.s3.amazonaws.com/c1/L8/042/034/LC08_L1TP_042034_20170616_20170629_01_T1/LC08_L1TP_042034_20170616_20170629_01_T1_B4.TIF'
+with rasterio.open(filepath) as src:
+    print(src.profile)
 ~~~
 {: .python}
 
+  {'driver': 'GTiff', 'dtype': 'uint16', 'nodata': None, 'width': 7821, 'height': 7951, 'count': 1, 'crs': CRS({'init': 'epsg:32611'}), 'transform': Affine(30.0, 0.0, 204285.0,
+         0.0, -30.0, 4268115.0), 'blockxsize': 512, 'blockysize': 512, 'tiled': True, 'compress': 'deflate', 'interleave': 'band'}
 
-## 3. Inspecting a Raster
+### What just happened?
 
-When it comes down to it, a geospatial raster is just an image with some
-geospatial information.  For GDAL and rasterio, reading the pixel values of a
-raster is a primary function.  For both libraries, pixel values are returned as
-a numpy array.
+ If you’re familiar with programming in python, you’ve probably seen context managers before. This context manager, **rasterio.open()** functions like the python standard library function open for opening files. The block of code within the with ... as statement is executed once the file is opened, and the file is closed when the context manager exits. This means that we don’t have to manually close the raster file, as the context manager handles that for us.
+
+ Instead of a local file path, rasterio knows how to read URLs too, so we just passed the link to the file on AWS
+
+ **src.profile** is a collection of metadata for the file. We see that it is a Geotiff (Gtiff), the image values are unsigned integer format, nodata values are not assigned, the image has a dimensions of 7711x7531, is a single band, is in [UTM coordinates](http://www.spatialreference.org/ref/epsg/wgs-84-utm-zone-11n), has a simple affine transformation, is chunked into smaller 512x512 arrays, tiled and compressed on the AWS hard drive where it is stored.
+
+ Note that we have not actually downloaded the image! It's full size is about 60Mb. But one nice aspect of the COG format is that we can easily grab downsampled versions of the full image for quick visualization:
 
 ~~~
-ds = gdal.Open(L8_RED_fn)
+# The grid of raster values can be accessed as a numpy array and plotted:
+with rasterio.open(filepath) as src:
+   oviews = src.overviews(1) # list of overviews from biggest to smallest
+   oview = oviews[-1] # let's look at the smallest thumbnail
+   print('Decimation factor= {}'.format(oview))
+   # NOTE this is using a 'decimated read' (http://rasterio.readthedocs.io/en/latest/topics/resampling.html)
+   thumbnail = src.read(1, out_shape=(1, int(src.height // oview), int(src.width // oview)))
 
-# Let's extract and plot the pixel values
-pixel_values = ds.ReadAsArray()
-plt.imshow(pixel_values)
+print('array type: ',type(thumbnail))
+print(thumbnail)
+
+plt.imshow(thumbnail)
 plt.colorbar()
-
-# and here's the geospatial projection Well-Known Text and the Affine Geotransform
-print ds.GetProjection()
-print ds.GetGeoTransform()
+plt.title('Overview - Band 4 {}'.format(thumbnail.shape))
+plt.xlabel('Column #')
+plt.ylabel('Row #')
 ~~~
 {: .python}
+  Decimation factor= 81
+  array type:  <class 'numpy.ndarray'>
+  [[0 0 0 ... 0 0 0]
+   [0 0 0 ... 0 0 0]
+   [0 0 0 ... 0 0 0]
+   ...
+   [0 0 0 ... 0 0 0]
+   [0 0 0 ... 0 0 0]
+   [0 0 0 ... 0 0 0]]
 
-    PROJCS["WGS 84 / UTM zone 11N",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",-117],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","32611"]]
+![Matplotlib plot of the red band of the current landsat 8 scene](1-overview-lowres.png)
 
-    (233025.03117445827, 30.0, 0.0, 4210078.842723392, 0.0, -30.0)
-
-![Matplotlib plot of the red band of the current landsat 8 scene](red_band_raw.png)
-
-Rasterio provides the same functionality, just with a slightly different
-interface.  If you're familiary with programming in python, you've probably
-seen **context managers** before.  This context manager, ``rasterio.open``
-functions like the python standard library function ``open`` for opening files.
-The block of code within the ``with ... as`` statement is executed once the file
-is opened, and the file is closed when the context manager exits.  This
-means that we don't have to manually close the raster file, as the 
-context manager handles that for us.
-
-By contrast, GDAL closes its raster dataset objects when its objects have no
-active references. In our case above, we're letting all of the raster objects
-go out of scope, so the cleanup happens implicitly at the end of the code.
+Earlier we saw in the metadata that a no-data value wasn't set, but pixels outside the imaged area are clearly set to "0". Images commonly look like this because of satellite orbits and the fact that the Earth is rotating as imagery is acquired! The colormap is often improved if we change the out of bounds area to NaN. To do this we have to convert the datatype from uint16 to float32 (so be aware the array with NaNs will take 2x the storage space). The serrated edge is due to the coarse sampling of the full resolution image that we are doing here.
 
 ~~~
-with rasterio.open(L8_RED_fn) as dem_raster:
-    pixel_values = dem_raster.read(1)  # band number
-    print dem_raster.crs   # This is returned as a dict version of the PROJ.4 format string.
-    print dem_raster.transform  # Returns the GDAL-style Affine Geotransform. (will be deprecated in rasterio 1.0)
-    print dem_raster.affine     # This is the Affine transformation object providing the same information as the GT.
+with rasterio.open(filepath) as src:
+    oviews = src.overviews(1)
+    oview = oviews[-1]
+    print('Decimation factor= {}'.format(oview))
+    thumbnail = src.read(1, out_shape=(1, int(src.height // oview), int(src.width // oview)))
+
+    thumbnail = thumbnail.astype('f4')
+    thumbnail[thumbnail==0] = np.nan
+
+plt.imshow(thumbnail)
+plt.colorbar()
+plt.title('Overview - Band 4 {}'.format(thumbnail.shape))
+plt.xlabel('Column #')
+plt.ylabel('Row #')
 ~~~
-{: .python}
 
-    {'init': u'epsg:32611'}
-    [233025.03117445827, 30.0, 0.0, 4210078.842723392, 0.0, -30.0]
-    | 30.00, 0.00, 233025.03|
-    | 0.00,-30.00, 4210078.84|
-    | 0.00, 0.00, 1.00|
+![Matplotlib plot of the red band with NaNs](overview-lowres-nans.png)
 
-## 4. Use Case: Calculating NDVI from Landsat 8 Imagery
 
-The Landsat program is the longest-running satellite imagery program, with the first satellite 
-launched in 1972.  Landsat 8 is the latest satellite in this program, and was
-launched in 2013.  Landsat observations are processed into "scenes", each of which is approximately 
-183 km x 170 km, with a temporal resolution of 16 days. The duration of the
-landsat program makes it an attractive source of medium-scale imagery for
-land surface change analyses.
 
-> ## Why not compare imagery from Landsat 7 and Landsat 8?
-> 
-> Because of Landsat 8's improved spectral quantization!  Landsat 8 can detect
-> 4096 levels of brighness with its 12-bit sensors.  Landsat 7 could detect only
-> 256 levels with its 8-bit sensors.  The end result is reduced graininess in the
-> resulting imagery.
->
-> [![Quanitzation example](quantization.png)](https://www.nasa.gov/content/goddard/taking-nasa-usgs-s-landsat-8-to-the-beach/)
-{: .callout}
-
-### 4a: Calculating NDVI
+# 3. Example computation: NDVI
 
 The [Normalized Difference Vegetation
-Index](https://en.wikipedia.org/wiki/Normalized_Difference_Vegetation_Index) is
-a simple indicator that can be used to assess whether the target includes healthy vegetation.  
-This calculation uses two bands of a multispectral image dataset, the Red and Near-Infrared (NIR) bands.
+Index](https://en.wikipedia.org/wiki/Normalized_Difference_Vegetation_Index) is a simple indicator that can be used to assess whether the target includes healthy vegetation.   This calculation uses two bands of a multispectral image dataset, the Red and Near-Infrared (NIR) bands:
 
-![NDVI equation](ndvi_equation.png)
+$$NDVI = \frac{(NIR - Red)}{(NIR + Red)}$$
 
-For this tutorial, we'll use the NIR and Red bands from a Landsat-8 scene above
-part of the central valley and the Sierra Nevada in California.  We'll be using
-[Level 1TP datasets](https://landsat.usgs.gov/landsat-processing-details),
-orthorectified, map-projected images containing radiometrically calibrated
-data. These images can be individually downloaded from a variety of sources
-including:
-
-* [USGS EarthExplorer](https://earthexplorer.usgs.gov/) (Account required for download)
-* [Amazon AWS](https://aws.amazon.com/public-datasets/landsat/)
-
-The specific scene we'll be using is:
-
-* Collection: `LC08_L1TP_042034_20130605_20170310_01_T1` (Available from USGS Earth Explorer)
-* Pre-collection: `LC80420342013156LGN00` ([Available from Amazon AWS](https://landsat-pds.s3.amazonaws.com/L8/042/034/LC80420342013156LGN00/index.html))
-
-More information on Landsat collections here: [https://landsat.usgs.gov/landsat-collections](https://landsat.usgs.gov/landsat-collections)
-
-|--------------------------------------------------|
-| Landsat 8 preview over the CA Central Valley     |
-|--------------------------------------------------|
-|![Preview of our landsat 8 scene][landsat8preview]|
-|--------------------------------------------------|
+For this tutorial, we'll use the NIR and Red bands from a Landsat-8 scene above part of the central valley and the Sierra Nevada in California.  We'll be using [Level 1TP datasets](https://landsat.usgs.gov/landsat-processing-details), orthorectified, map-projected images containing radiometrically calibrated data.
 
 ### Bands
 
-* Red: Band 4 (file: ``LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF``)
-* Near-Infrared: Band 5 (file: ``LC08_L1TP_042034_20130605_20170310_01_T1_B5_120x120.tif``)
+* Red: Band 4
+* Near-Infrared: Band 5
 
-Because of the longevity of the landsat mission and because different sensors
-on the satellite record data at different resolutions, these bands are
-individually stored as single-band raster files.  Some other rasters may store
-multiple bands in the same file.
+Because of the longevity of the landsat mission and because different sensors on the satellite record data at different resolutions, these bands are individually stored as single-band raster files.  Some other rasters may store multiple bands in the same file.
 
-NB: Landsat scenes are distributed with a 30m pixel resolution.  For the sake
-of this tutorial and the computational time on our jupyterhub instance, these
-scenes have been downsampled to 120m.
-
-{% highlight python %}
-L8_RED_fn = '../data/landsat/LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF'
-L8_NIR_fn = '../data/landsat/LC08_L1TP_042034_20130605_20170310_01_T1_B5_120x120.TIF'
-{% endhighlight %}
-
-Let's start out by:
-
-* opening the raster datasets using the GDAL Python API
-* extracting the pixel values from both of these rasters 
-* calculating the NDVI
-* visualizing the calculated NDVI values
-
-As a reminder, here's the NDVI equation:
-
-![NDVI equation](ndvi_equation.png)
-
+NB: Full resolution Landsat scenes are distributed with a 30m pixel resolution. For the sake of this tutorial and the computational time on our jupyterhub instance, we will use downsampled overviews.
 
 ~~~
-red_ds = gdal.Open(L8_RED_fn)
-red_band = red_ds.GetRasterBand(1)
-red = red_band.ReadAsArray()
+# Use the same example image:
+date = '2017-06-16'
+url = 'http://landsat-pds.s3.amazonaws.com/c1/L8/042/034/LC08_L1TP_042034_20170616_20170629_01_T1/'
+redband = 'LC08_L1TP_042034_20170616_20170629_01_T1_B{}.TIF'.format(4)
+nirband = 'LC08_L1TP_042034_20170616_20170629_01_T1_B{}.TIF'.format(5)
+
+with rasterio.open(url+redband) as src:
+    profile = src.profile
+    oviews = src.overviews(1) # list of overviews from biggest to smallest
+    oview = oviews[1]  # Use second-highest resolution overview
+    print('Decimation factor= {}'.format(oview))
+    red = src.read(1, out_shape=(1, int(src.height // oview), int(src.width // oview)))
+
 plt.imshow(red)
 plt.colorbar()
+plt.title('{}\nRed {}'.format(redband, red.shape))
+plt.xlabel('Column #')
+plt.ylabel('Row #')
 ~~~
-{: .python}
-![Matplotlib plot of the red band of the current landsat 8 scene](red_band_raw.png)
 
+![20170616 red band raster](20170616-red.png)
 
 ~~~
-nir_ds = gdal.Open(L8_NIR_fn)
-nir_band = nir_ds.GetRasterBand(1)
-nir = nir_band.ReadAsArray()
+with rasterio.open(url+nirband) as src:
+    oviews = src.overviews(1) # list of overviews from biggest to smallest
+    oview = oviews[1]  # Use second-highest resolution overview
+    nir = src.read(1, out_shape=(1, int(src.height // oview), int(src.width // oview)))
+
 plt.imshow(nir)
 plt.colorbar()
+plt.title('{}\nNIR {}'.format(nirband, nir.shape))
+plt.xlabel('Column #')
+plt.ylabel('Row #')
 ~~~
-{: .python}
-![Matplotlib plot of the near-infrared band of the current landsat 8 scene](nir_band_raw.png)
 
-Now, let's calculate the NDVI from these two arrays.
-
-~~~
-def ndvi(red, nir):
-    """Calculate NDVI."""
-    return (nir - red) / (nir + red)
-
-plt.imshow(ndvi(red, nir))
-plt.colorbar()
-~~~
-{: .python}
-![Matplotlib plot of calculated NDVI for the current landsat 8 scene](ndvi_integer_division.png)
-
-
-The plot is filled with ``0``!  It turns out that the datatype of the input and output 
-arrays is important, and both of the input rasters have pixel values that are
-positive (unsigned) integers, which is also reflected in the array's numpy
-dtypes.  This is probably leading to an integer division issue if we're using
-python 2.  We can verify this hypothesis by checking the datatypes of both
-the rasters and the resulting arrays.
+![20170616 NIR band raster](20170616-nir.png)
 
 ~~~
-    print gdal.GetDataTypeName(red_band.DataType), red.dtype
-    print gdal.GetDataTypeName(nir_band.DataType), nir.dtype
-~~~
-{: .python}
+def calc_ndvi(nir,red):
+    '''Calculate NDVI from integer arrays'''
+    nir = nir.astype('f4')
+    red = red.astype('f4')
+    ndvi = (nir - red) / (nir + red)
+    return ndvi
 
-    UInt16 uint16
-    UInt16 uint16
-
-Let's convert the input arrays to a floating-point dtype and calculate the NDVI once again.
-
-~~~
-import numpy as np
-
-red = red.astype(np.float64)
-nir = nir.astype(np.float64)
-
-ndvi = ndvi(red, nir)
+ndvi = calc_ndvi(nir,red)
 plt.imshow(ndvi, cmap='RdYlGn')
 plt.colorbar()
+plt.title('NDVI {}'.format(date))
+plt.xlabel('Column #')
+plt.ylabel('Row #')
 ~~~
-{: .python}
-![Matplotlib plot of calculated NDVI with invalid nodata areas for the current landsat 8 scene](ndvi_invalid_nodata_areas.png)
 
-Looks like a reasonable output!
+![20170616 NIR band raster](20170616-ndvi.png)
 
-According to the [docs for Landsat 8](https://landsat.usgs.gov/collectionqualityband),
-those blank areas around the edges should be ignored.  Many raster datasets
-implement this with an optional **nodata value**.  If a nodata value is set,
-then any pixel values that match it should be ignored.  It turns out that this
-band doesn't have a defined nodata value.
 
-~~~
-# This band does not have a nodata value!
-print red_band.GetNoDataValue()
-~~~
-{: .python}
+# 4. Save the NDVI raster to local disk
+So far, we have read in a cloud-optimized geotiff from the Cloud into our computer memory (RAM), and done a simple computation. What if we want to save this result locally for future use?
 
-    None
-
-It turns out that we know from the docs that there's another landsat band
-(``_BQA.TIF``) for our scene that contains extra metadata about the pixels of
-the scene.  In this raster, any pixels with a value of ``1`` is filler and can
-be ignored.
-
-Let's create an NDVI array where:
-* Any pixels marked as filler in the ``_BQA.TIF`` raster are set to ``-1``.
-* Any pixels where the denominator is ``0`` is also set to ``-1``.
+Since we have used a subsampled overview, we have to modify the orginal metadata before saving! In particular, the Affine matrix describing the coordinates is different (new resolution and extents, and we've changed the datatype). We'll stick with Geotiff, but note that it is no longer cloud-optimized.
 
 ~~~
-L8_QA_fn = '../data/landsat/LC08_L1TP_042034_20130605_20170310_01_T1_BQA_120x120.TIF'
+localname = 'LC08_L1TP_042034_20170616_20170629_01_T1_NDVI_OVIEW.tif'
 
-import numpy as np
+with rasterio.open(url+nirband) as src:
+    profile = src.profile.copy()
 
-qa_ds = gdal.Open(L8_QA_fn)
-qa_band = qa_ds.GetRasterBand(1)
-qa = qa_band.ReadAsArray()
+    aff = src.transform
+    newaff = rasterio.Affine(aff.a * oview, aff.b, aff.c,
+                             aff.d, aff.e * oview, aff.f)
+    profile.update({
+            'dtype': 'float32',
+            'height': ndvi.shape[0],
+            'width': ndvi.shape[1],
+            'transform': newaff})  
 
-def ndvi_with_nodata(red, nir, qa):
-    ndvi = (nir - red) / (nir + red)
-    ndvi[qa == 1] = -1
-    return ndvi
-    
-ndvi = ndvi_with_nodata(red, nir, qa)
+    with rasterio.open(localname, 'w', **profile) as dst:
+        dst.write_band(1, ndvi)
+~~~
+
+Be sure to check that the saved file looks the same:
+
+~~~
+# Reopen the file and plot
+with rasterio.open(localname) as src:
+    print(src.profile)
+    ndvi = src.read(1) # read the entire array
+
 plt.imshow(ndvi, cmap='RdYlGn')
 plt.colorbar()
+plt.title('NDVI {}'.format(date))
+plt.xlabel('Column #')
+plt.ylabel('Row #')
 ~~~
-{: .python }
-![Matplotlib plot with obviously specified nodata value](ndvi_with_nodata_value.png)
 
-## 5. Save the NDVI Raster to Disk
-
-Now, let's create an output geospatial raster and write our new NDVI values to it.
-
-To do this, we need to tell GDAL which file format to use, if there are any
-special options that should be set when the file is created, and what the
-raster's dimensions should be.  We'll use the ``GTiff`` driver for this.
-GeoTiff is an open format that is very well supported by GDAL and most GIS
-applications.  (For a full list of supported formats, take a look at
-``gdalinfo --formats``.)
-
+Note that rasterio also has a 'convenience method' for plotting with georeferenced coordinates
 ~~~
-driver = gdal.GetDriverByName('GTiff')
-new_dataset = driver.Create('ndvi.tif',
-                            ds.RasterXSize,    # number of columns
-                            ds.RasterYSize,    # number of rows
-                            1,                 # number of bands
-                            gdal.GDT_Float32)  # datatype of the raster
-new_dataset.SetProjection(ds.GetProjection())
-new_dataset.SetGeoTransform(ds.GetGeoTransform())
-
-# Now we need to set the band's nodata value to -1
-new_band = new_dataset.GetRasterBand(1)
-new_band.SetNoDataValue(-1)
-
-# And finally, let's write our NDVI array.
-new_band.WriteArray(ndvi)
+# in this case, coordinates are Easting [m] and Northing [m], and colorbar is default instead of RdYlGn
+with rasterio.open(localname) as src:
+    fig, ax = plt.subplots()
+    rasterio.plot.show(src, ax=ax, title='NDVI')
 ~~~
-{: .python}
 
-Here's the equivalent code to write a raster with rasterio.  You can see that
-both require the same information, but the way each library expresses the same
-things is quite different.
+![20170616 NIR band raster](20170616-convenience.png)
+
+## Spatial indexing and extracting values
+Raster images really have two sets of coordinates. First, 'image coordinates' correspond to the row and column for a specific pixel. Second, the 'spatial coordinates' correspond to the location of each pixel on the surface of the Earth. Rasterio makes it convenient to use both coordinate systems.
+
+Lets say you want the value of NDVI at a specific point in this scene. For example Fresno, CA (-119.770163586, 36.741997032). But the image is in UTM coordinates, so you have to first convert these points to UTM (Many websites will do this for you https://www.geoplaner.com), or you can use the pyproj library. Be warned that this only works if you read the dataset at it's full resolution (if you do decimated or windowed reads of the file, you need to adjust the affine transform).
 
 ~~~
-with rasterio.open(L8_RED) as red_raster:
-    source_crs = red_raster.crs
-    source_transform = red_raster.transform
+with rasterio.open(localname) as src:
+    # Use pyproj to convert point coordinates
+    utm = pyproj.Proj(src.crs) # Pass CRS of image from rasterio
+    lonlat = pyproj.Proj(init='epsg:4326')
 
-with rasterio.open('ndvi.tif', 'w', driver='GTIff',
-                   height=ndvi.shape[0],    # numpy of rows
-                   width=ndvi.shape[1],     # number of columns
-                   count=1,                        # number of bands
-                   dtype=rasterio.dtypes.float64,  # this must match the dtype of our array
-                   crs=source_crs,
-                   transform=source_transform) as ndvi_raster:
-    ndvi_raster.write(ndvi, 1)  # optional second parameter is the band number to write to
-    ndvi_raster.nodata = -1  # set the raster's nodata value
-~~~
-{: .python}
+    lon,lat = (-119.770163586, 36.741997032)
+    east,north = pyproj.transform(lonlat, utm, lon, lat)
 
-> ## Creating copies of datasets
->
-> If we were looking to create a strict copy of one of our original GDAL
-> datasets, we could call the much more abbreviated method
-> ``driver.CreateCopy``.
->
-> ~~~
-> driver = gdal.GetDriverByName('GTiff')
-> new_dataset = driver.CreateCopy('ndvi.tif', red_ds)
-> ~~~
-> {: .python}
->
-> This is supported my many (but not all) of GDAL's drivers, and it assumes
-> that the output dataset will have all of the same attributes as the current
-> dataset.  In our case, we need a different datatype, so we use
-> ``gdal.Create`` instead.
->
-> The equivalent rasterio code is:
->
-> ~~~
-> rasterio.copy(L8_RED_fn, 'ndvi.tif')
-> ~~~
-> {: .python}
->
-{: .callout}
+    print('Fresno NDVI\n-------')
+    print(f'lon,lat=\t\t({lon:.2f},{lat:.2f})')
+    print(f'easting,northing=\t({east:g},{north:g})')
+
+    # What is the corresponding row and column in our image?
+    row, col = src.index(east, north) # spatial --> image coordinates
+    print(f'row,col=\t\t({row},{col})')
+
+    # What is the NDVI?
+    value = ndvi[row, col]
+    print(f'ndvi=\t\t\t{value:.2f}')
 
 
-And now that we've written out a new file, let's take a look at its
-characteristics with one of the GDAL command-line utilities, ``gdalinfo``.
-This utility is very useful for quickly displaying relevant information about a
-raster without exploring its data.
-
-~~~
-!gdalinfo ndvi.tif
-~~~
-{: .shell}
-
-    Driver: GTiff/GeoTIFF
-    Files: ndvi.tif
-    Size is 1928, 1881
-    Coordinate System is:
-    PROJCS["WGS 84 / UTM zone 11N",
-        GEOGCS["WGS 84",
-            DATUM["WGS_1984",
-                SPHEROID["WGS 84",6378137,298.257223563,
-                    AUTHORITY["EPSG","7030"]],
-                AUTHORITY["EPSG","6326"]],
-            PRIMEM["Greenwich",0],
-            UNIT["degree",0.0174532925199433],
-            AUTHORITY["EPSG","4326"]],
-        PROJECTION["Transverse_Mercator"],
-        PARAMETER["latitude_of_origin",0],
-        PARAMETER["central_meridian",-117],
-        PARAMETER["scale_factor",0.9996],
-        PARAMETER["false_easting",500000],
-        PARAMETER["false_northing",0],
-        UNIT["metre",1,
-            AUTHORITY["EPSG","9001"]],
-        AUTHORITY["EPSG","32611"]]
-    Origin = (203385.000000000000000,4261815.000000000000000)
-    Pixel Size = (120.000000000000000,-120.000000000000000)
-    Metadata:
-      AREA_OR_POINT=Area
-    Image Structure Metadata:
-      INTERLEAVE=BAND
-    Corner Coordinates:
-    Upper Left  (  203385.000, 4261815.000) (120d23'56.68"W, 38d27'19.28"N)
-    Lower Left  (  203385.000, 4036095.000) (120d18'29.96"W, 36d25'27.35"N)
-    Upper Right (  434745.000, 4261815.000) (117d44'54.15"W, 38d30' 8.31"N)
-    Lower Right (  434745.000, 4036095.000) (117d43'42.06"W, 36d28' 4.47"N)
-    Center      (  319065.000, 4148955.000) (119d 2'45.84"W, 37d28'11.22"N)
-    Band 1 Block=1928x1 Type=Float64, ColorInterp=Gray
-      NoData Value=-1
-
-## 6. Less Verbose Raster Calculators
-
-### 6a. pygeoprocessing.raster_calculator
-
-[``Pygeoprocessing``](http://pypi.python.org/pypi/pygeoprocessing) is a python
-library developed by the [Natural Capital Project](http://naturalcapitalproject.org)
-that offers open-source, computationally-efficient raster, vector and hydrological
-routines for use in geoprocessing workflows.
-
-One of the functions that pygeoprocessing provides is a 
-[raster calculator][pygeoprocessing.raster_calculator], which will handle all
-of the boilerplate code for opening the needed rasters,
-creating the output raster, and handling input rasters in a
-computationally-efficient manner.
-
-The assumptions of this raster calculator are:
-* The input rasters are assumed to be spatially aligned, but need only have the same dimensions.
-* Input rasters must have the same block sizes.
-* Any GDAL-readable format may be used for input rasters, but a GeoTiff will be written out.
-
-~~~
-# Note: this requires pygeoprocessing >= 0.4
-import pygeoprocessing
-
-# Here's the same NDVI function we defined earlier
-def ndvi_with_nodata(red, nir, qa):
-    ndvi = (nir - red) / (nir + red)
-    ndvi[qa == 1] = -1
-    return ndvi
-
-pygeoprocessing.raster_calculator(
-    [(L8_RED, 1), (L8_NIR, 1), (L8_QA, 1)],
-    local_op=ndvi_with_nodata,
-    target_raster_path='ndvi.tif',
-    datatype_target=gdal.GDT_Float32,
-    nodata_target=-1)  # we assume the output nodata value is -1 in our NDVI function
+    # Or if you see an interesting feature and want to know the spatial coordinates:
+    row, col = 200, 450
+    east, north = src.xy(row,col) # image --> spatial coordinates
+    lon,lat = pyproj.transform(utm, lonlat, east, north)
+    value = ndvi[row, col]
+    print(f'''
+Interesting Feature
+-------
+row,col=          ({row},{col})
+easting,northing= ({east:g},{north:g})
+lon,lat=          ({lon:.2f},{lat:.2f})
+ndvi=              {value:.2f}
+''')
 ~~~
 {: .python}
 
-### 6b. gdal_calc.py
+  Fresno NDVI
+  -------
+  lon,lat=		(-119.77,36.74)
+  easting,northing=	(252664,4.06983e+06)
+  row,col=		(734,179)
+  ndvi=			0.24
 
-If you have the GDAL command-line utilities installed, you can also use the
-provided python script to do raster calculation for you.  Like with the
-pygeoprocessing approach, all your raster inputs are assumed to be aligned and
-they must have the same dimensions.  This utility is only available from its
-command-line interface.
-
-~~~
-gdal_calc.py \
-    -A ../data/landsat/LC08_L1TP_042034_20130605_20170310_01_T1_B4_120x120.TIF \
-    -B ../data/landsat/LC08_L1TP_042034_20130605_20170310_01_T1_B5_120x120.TIF \
-    -C ../data/landsat/LC08_L1TP_042034_20130605_20170310_01_T1_BQA_120x120.TIF \
-    --outfile=ndvi_gdalcalc.tif \
-    --type=Float64 \
-    --overwrite \
-    --calc="numpy.where(C == 1, -1, (A-B)/(A+B))"
-~~~
-{: .shell}
+  Interesting Feature
+  -------
+  row,col=          (200,450)
+  easting,northing= (325920,4.21398e+06)
+  lon,lat=          (-118.98,38.06)
+  ndvi=              -0.10
 
 
-## 7. What about when your rasters are from different sources, with different projection, extent, resolution?
+# 5. Calculate change in NDVI over time
 
-To be able to do raster math and have the outputs make sense, we may need do
-some combination of reprojecting, resampling and clipping.  This can be done
-with just GDAL, but there are several tools out there to help us with this
-process.
+Let's take a look at the difference in NDVI between a scene in June 2013 and June 2017. If you went to the [AWS Landsat Archive page](https://registry.opendata.aws/landsat-8), you probably noticed that it isn't obvious how to search and discover images (most of the time you probably won't know the row, path, or full URL of images over your area of interest!) There are many options for searching, graphical web applications like [NASA's Earthdata Search](https://search.earthdata.nasa.gov), or convenient Python tools like DevSeed's [sat-search](https://github.com/sat-utils/sat-search), among many others! We won't go into these tools here, but we encourage you to experiment with your own image scenes. Here is a file from June 2018 that was easy to find with Landsat for AWS using the Path and Row from the earlier URL:
 
-> ## Warping directly with GDAL/rasterio
-> 
-> We won't cover GDAL and rasterio's low-level warping functionality, but documentation is available online if you're interested.
-> * [``rasterio.warp.reproject``](https://mapbox.github.io/rasterio/topics/reproject.html) python API documentation
-> * [``osgeo.gdal.ReprojectImage``](http://www.gdal.org/gdalwarper_8h.html#ad36462e8d5d34642df7f9ea1cfc2fec4) API documentation
-> * [``gdalwarp``](http://www.gdal.org/gdalwarp.html) command-line interface to GDAL's warping functionality
-> * ``rio warp`` (``rio warp --help``) command-line tool to rasterio's warping functionality
->
-> Both ``pygeoprocessing`` and ``pygeotools`` have utilities to help automate
-> the warping and aligning of stacks of inputs, and are generally easier to use
-> than directly warping a single raster.
-{: .callout}
+https://landsatonaws.com/L8/042/034/LC08_L1TP_042034_20180619_20180703_01_T1
 
-### 7a. Mount Rainier DEM example - [next episode](https://geohackweek.github.io/raster/06-pygeotools_rainier/)
+With the band 4 imagery URL:
 
-### 7b. Calculating Change in NDVI with Pygeoprocessing
-
-How about if we want to calculate the change in NDVI between two different
-landsat 8 scenes?  Here we have the same scene, both from June, but one is from
-2013 and the other is from 2016.  They're already in the same projection, but
-they are clearly misaligned.  Let's use pygeoprocessing to align and clip the
-inputs so the match and then use ``pygeoprocessing.raster_calculator`` to
-calculate the difference in NDVI between the two years.
-
-|-------------------------------------------------------------------------------------------|
-| Imperfect overlap between the same Landsat 8 scene from 2013 and 2016                     |
-|-------------------------------------------------------------------------------------------|
-| ![imperfect overlap between two years of the same Landsat 8 scene](imperfect_overlap.png) |
-|-------------------------------------------------------------------------------------------|
+http://landsat-pds.s3.amazonaws.com/c1/L8/042/034/LC08_L1TP_042034_20180619_20180703_01_T1/LC08_L1TP_042034_20180619_20180703_01_T1_B4.TIF
 
 ~~~
-# These are the paths to where we would like the aligned stack of inputs to be saved on disk.
-al_red_2013 = 'red_2013.tif'
-al_red_2016 = 'red_2016.tif'
-al_nir_2013 = 'nir_2013.tif'
-al_nir_2016 = 'nir_2016.tif'
-al_qa_2013 = 'qa_2013.tif'
-al_qa_2016 = 'qa_2016.tif'
-aligned_rasters_list = [al_red_2013, al_nir_2013, al_qa_2013, al_red_2016, al_nir_2016, al_qa_2016]
+# Use the same example image:
+date2 = '2018-06-19'
+url2 = 'http://landsat-pds.s3.amazonaws.com/c1/L8/042/034/LC08_L1TP_042034_20180619_20180703_01_T1/'
+redband2 = 'LC08_L1TP_042034_20180619_20180703_01_T1_B{}.TIF'.format(4)
+nirband2 = 'LC08_L1TP_042034_20180619_20180703_01_T1_B{}.TIF'.format(5)
 
+filepath = url2+redband2
+with rasterio.open(filepath) as src:
+    print('Opening:', filepath)
+    oviews = src.overviews(1) # list of overviews from biggest to smallest
+    oview = oviews[1]  # Use second-highest resolution overview
+    print('Decimation factor= {}'.format(oview))
+    red2 = src.read(1, out_shape=(1, int(src.height // oview), int(src.width // oview)))
 
-red_2013_info = pygeoprocessing.get_raster_info(L8_RED_2013)
+filepath = url2+nirband2
+with rasterio.open(filepath) as src:
+    print('Opening:', filepath)
+    oviews = src.overviews(1) # list of overviews from biggest to smallest
+    oview = oviews[1]  # Use second-highest resolution overview
+    print('Decimation factor= {}'.format(oview))
+    nir2 = src.read(1, out_shape=(1, int(src.height // oview), int(src.width // oview)))
 
-# align the stack of rasters
-pygeoprocessing.align_and_resize_raster_stack(
-    [L8_RED_2013, L8_NIR_2013, L8_QA_2013, L8_RED_2016, L8_NIR_2016, L8_QA_2016],
-    aligned_rasters_list,
-    ['nearest']*6,
-    target_pixel_size=red_2013_info['pixel_size'],
-    bounding_box_mode='intersection')
-
-~~~
-{: .python}
-
-Once ``align_and_resize_raster_stack`` completes, all of the aligned raster
-datasets have the same dimensions and resolution.  We can double-check this by
-verifying that the raster's critical characteristics all match.
-
-~~~
-print set(str(pygeoprocessing.get_raster_info(filename)) for filename in aligned_rasters_list)
+ndvi2 = calc_ndvi(nir2, red2)
 ~~~
 
-Now that our rasters are aligned, we can calculate the difference in NDVI rasters.
+And plot the results with matplotlib:
 
 ~~~
-def diff_ndvi(red_2013, nir_2013, qa_2013, red_2016, nir_2016, qa_2016):
-    # valid pixel stacks in this calculation are those where:
-    #   * the QA raster for both Landsat scenes indicate that the pixels aren't fill
-    #   * The denominator of the NDVI calculation isn't 0.
-    # By indexing into each raster, we only perform our NDVI calculations on
-    # stacks that we know are valid.
-    valid_pixels = (qa_2013!=1) & (qa_2016!=1) & (red_2013+nir_2013 != 0) & (red_2016+nir_2016 != 0)
+fig, axes = plt.subplots(1,3, figsize=(14,6), sharex=True, sharey=True)
 
-    def calc_ndvi(red, nir):
-        red = red[valid_pixels].astype(numpy.float)
-        nir = nir[valid_pixels].astype(numpy.float)
-        return (nir - red) / (nir + red)
+plt.sca(axes[0])
+plt.imshow(ndvi, cmap='RdYlGn', vmin=-1, vmax=1)
+plt.colorbar(shrink=0.5)
+plt.title('NDVI {}'.format(date))
+plt.xlabel('Column #')
+plt.ylabel('Row #')
 
-    ndvi_2013 = calc_ndvi(red_2013, nir_2013)
-    ndvi_2016 = calc_ndvi(red_2016, nir_2016)
+plt.sca(axes[1])
+plt.imshow(ndvi2, cmap='RdYlGn', vmin=-1, vmax=1)
+plt.colorbar(shrink=0.5)
+plt.title('NDVI {}'.format(date2))
 
-    ndvi = numpy.empty_like(red_2013, dtype=numpy.float32)
-    ndvi[:] = -9999
-    ndvi[valid_pixels] = ndvi_2016 - ndvi_2013
-    return ndvi
-
-
-pygeoprocessing.raster_calculator(
-    [(al_red_2013, 1), (al_nir_2013, 1), (al_qa_2013, 1),
-     (al_red_2016, 1), (al_nir_2016, 1), (al_qa_2016, 1)],
-    diff_ndvi, 'diff_ndvi.tif', gdal.GDT_Float32, -9999)
-
-pyplot.imshow(gdal.Open('diff_ndvi.tif').ReadAsArray(), cmap='RdYlGn')
-pyplot.colorbar()
+plt.sca(axes[2])
+plt.imshow(ndvi2 - ndvi, cmap='bwr', vmin=-1, vmax=1)
+plt.colorbar(shrink=0.5)
+plt.title('Diff ({} - {})'.format(date2, date))
 ~~~
-{: .python}
 
-Pygeoprocessing also has a few routines that will help us to determine the mean change in NDVI per county.
+![20180619 - 20170616 NDVI Difference](ndvi-difference.png)
+
+### What just happened?
+
+We just loaded 4 decimated Landsat 8 band images into memory and computed the difference in NDVI between two dates. That was relatively easy because the Tier 1 Landsat 8 images are on the exact same grid and use the same reference frame. This is know as 'Analysis Ready Data'. In the geosciences, we commonly have data in WGS84 Lat, Lon. Or what if you want to compare to NDVI estimated from Sentinel-2 satellite acquisitions, which are on a different grid?
+
+
+# 6. Advanced uses of rasterio
+
+Rasterio can also be used for masking, reprojecting, and regridding distinct datasets. Here is one simple example to reproject our local NDVI onto a WGS84 Lat/Lon Grid. The example creates a 'VRT' file, which is merely a ASCII text file describing the transformation and other image metadata. The array values do no need to be duplicated, the VRT file just contains a reference to the local file (LC08_L1TP_042034_20170616_20170629_01_T1_NDVI_OVIEW.tif). This is extremely useful to avoid duplicating lots of data and filling up your computer!
 
 ~~~
-# reproject the vector to the Raster's projection
-reprojected_vector = 'ca_counties_utm11.shp'
-pygeoprocessing.reproject_vector(
-    '../data/CA_counties/CA_counties.shp', red_2013_info['projection'],
-    reprojected_vector)
+import rasterio.warp
+import rasterio.shutil
 
-# Aggregate ndvi by county name
-stats = pygeoprocessing.zonal_statistics(
-    ('diff_ndvi.tif', 1), reprojected_vector, 'NAME',
-    polygons_might_overlap=False)
+localname = 'LC08_L1TP_042034_20170616_20170629_01_T1_NDVI_OVIEW.tif'
+vrtname = 'LC08_L1TP_042034_20170616_20170629_01_T1_NDVI_OVIEW_WGS84.vrt'
 
-for county_name, aggregate_data in stats.iteritems():
-    try:
-        print county_name, aggregte_data['sum']/aggregate_data['count']
-    except ZeroDivisionError:
-        pass
+with rasterio.open(localname) as src:
+    with rasterio.vrt.WarpedVRT(src, crs='epsg:4326', resampling=rasterio.enums.Resampling.bilinear) as vrt:
+        rasterio.shutil.copy(vrt, vrtname, driver='VRT')
+
+# Open the local warped file and plot
+# NOTE our coordinates have changed to lat, lon. we should probably crop the edge artifacts do to reprojection too!
+with rasterio.open(vrtname) as src:
+    rasterio.plot.show(src, title='NDVI', cmap='RdYlGn', vmin=-1, vmax=1)
 ~~~
-{: .python}
 
-    Mariposa   -0.0118313196727
-    Fresno     -0.00661338400231
-    Mono       -0.00920776345542
-    Merced     0.00714124114347
-    Madera     -0.00574486546421
-    Tuolumne   0.00532270278817
-    Inyo       -0.00188927021006
-    Tulare     -0.00599385776893
-    Alpine     0.0167325024718
+![20170616 NDVI Warped to Lat Lon Coordinates](ndvi-warped.png)
 
 
+The issue with VRTs is now you have two files and let's say you want to share this image with a colleague. Also if you move things around on your computer, the paths might get mixed up, so in some cases it's nice to save a complete reprojected file. The second code block does this, saving our NDVI as a Geotiff in WGS84.
 
-[landsat8preview]: https://landsat-pds.s3.amazonaws.com/L8/042/034/LC80420342013156LGN00/LC80420342013156LGN00_thumb_small.jpg "Landsat 8 preview image over the California Central Valley"
-[pygeoprocessing.raster_calculator]: http://pythonhosted.org/pygeoprocessing/packages/geoprocessing.html#pygeoprocessing.geoprocessing.raster_calculator
+~~~
+localname = 'LC08_L1TP_042034_20170616_20170629_01_T1_NDVI_OVIEW.tif'
+tifname = 'LC08_L1TP_042034_20170616_20170629_01_T1_NDVI_OVIEW_WGS84.tif'
+
+dst_crs = 'EPSG:4326'
+
+with rasterio.open(localname) as src:
+    profile = src.profile.copy()
+
+    transform, width, height = rasterio.warp.calculate_default_transform(
+        src.crs, dst_crs, src.width, src.height, *src.bounds)
+
+    profile.update({
+        'crs': dst_crs,
+        'transform': transform,
+        'width': width,
+        'height': height
+    })
+
+    with rasterio.open(tifname, 'w', **profile) as dst:
+        rasterio.warp.reproject(
+            source=rasterio.band(src, 1),
+            destination=rasterio.band(dst, 1),
+            src_transform=src.transform,
+            src_crs=src.crs,
+            dst_transform=transform,
+            dst_crs=dst_crs,
+            resampling=rasterio.warp.Resampling.bilinear)
+~~~
+
+# Additional resources
+
+This just scratches the surface of what you can do with rasterio. Check out the excellent official documentation as you continue exploring:
+
+https://rasterio.readthedocs.io/en/latest/
