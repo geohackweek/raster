@@ -1,5 +1,5 @@
 ---
-title: "Geospatial Concepts: Raster Data"
+title: "Introduction to Raster Data"
 teaching: 5
 exercises: 0
 
@@ -71,7 +71,7 @@ that ignores spatial information), we can accidentally strip this spatial
 metadata.  Photoshop, for example, can edit GeoTiffs, but we'll lose the embedded
 CRS and geotransform!
 
-# Common Types of Raster Datasets
+# Common types of raster datasets
 
 Examples of common raster datasets include:
 
@@ -81,9 +81,12 @@ Examples of common raster datasets include:
     * [Land-use/Land-cover products](https://www.mrlc.gov/nlcd2011.php) from classification of multispectral data
     * Digital Elevation Models (DEMs) such as [ASTER GDEM](https://asterweb.jpl.nasa.gov/gdem.asp)
 
-# Limitations of the Raster Format
+# Limitations of the raster format
 * Measurements are spatially arranged in a regular grid, which may not be an
   accurate representation of real-world phenomena.
 * Space-filling model assumes that all pixels have value
 * Changes in resolution can drastically change the meaning of values in a dataset
 
+# Further reading
+
+* There is a lot of material out there describing rasters. Here is another great lesson that uses a software carpentry template: [https://datacarpentry.org/organization-geospatial/01-intro-raster-data/index.html](https://datacarpentry.org/organization-geospatial/01-intro-raster-data/index.html)
