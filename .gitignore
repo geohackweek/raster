@@ -3,3 +3,5 @@
 .sass-cache
 _site
 __pycache__
+.db.json
+.idea 
